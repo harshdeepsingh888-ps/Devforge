@@ -21,6 +21,26 @@ export const projectRoutes: FastifyPluginAsync<
       data: projects,
     };
   });
+  app.get<{
+  Params: {
+    projectId: string;
+  };
+}>("/:projectId", async (request, reply) => {
+  const project = await options.repository.findById(
+    request.params.projectId,
+  );
+
+  if (!project) {
+    return reply.code(404).send({
+      error: "PROJECT_NOT_FOUND",
+      message: "Project not found.",
+    });
+  }
+
+  return {
+    data: project,
+  };
+});
 
   app.post<{
     Body: CreateProjectBody;

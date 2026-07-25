@@ -27,6 +27,58 @@ test("GET /api/projects returns an empty project list", async (t) => {
     data: [],
   });
 });
+test("GET /api/projects/:projectId returns a project", async (t) => {
+  const repository = new InMemoryProjectRepository();
+
+  const createdProject = await repository.create({
+    name: "DevForge",
+    description: "Developer operating system",
+  });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    projectRepository: repository,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/projects/${createdProject.id}`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    data: createdProject,
+  });
+});
+test("GET /api/projects/:projectId returns 404 for an unknown project", async (t) => {
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    projectRepository: new InMemoryProjectRepository(),
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/api/projects/unknown-project-id",
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.json(), {
+    error: "PROJECT_NOT_FOUND",
+    message: "Project not found.",
+  });
+});
 
 test("POST /api/projects creates an active project", async (t) => {
   const app = buildApp({

@@ -8,12 +8,17 @@ import type {
 export interface ProjectRepository {
   create(input: CreateProjectInput): Promise<Project>;
   findAll(): Promise<Project[]>;
+  findById(projectId: string): Promise<Project | null>;
 }
 
-export class InMemoryProjectRepository implements ProjectRepository {
+export class InMemoryProjectRepository
+  implements ProjectRepository
+{
   private readonly projects = new Map<string, Project>();
 
-  async create(input: CreateProjectInput): Promise<Project> {
+  async create(
+    input: CreateProjectInput,
+  ): Promise<Project> {
     const timestamp = new Date().toISOString();
 
     const project: Project = {
@@ -32,5 +37,11 @@ export class InMemoryProjectRepository implements ProjectRepository {
 
   async findAll(): Promise<Project[]> {
     return Array.from(this.projects.values());
+  }
+
+  async findById(
+    projectId: string,
+  ): Promise<Project | null> {
+    return this.projects.get(projectId) ?? null;
   }
 }

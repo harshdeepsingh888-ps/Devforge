@@ -1,7 +1,7 @@
 ﻿export const PROJECT_STATUSES = [
   "ACTIVE",
   "PAUSED",
-  "COMPLETED",
+  "ARCHIVED",
 ] as const;
 
 export type ProjectStatus =

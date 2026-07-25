@@ -1,6 +1,10 @@
 ﻿import type { FastifyPluginAsync } from "fastify";
 
 import type { ProjectRepository } from "./project.repository.js";
+import {
+  PROJECT_STATUSES,
+  type ProjectStatus,
+} from "./project.types.js";
 
 interface ProjectRoutesOptions {
   repository: ProjectRepository;
@@ -9,6 +13,14 @@ interface ProjectRoutesOptions {
 interface CreateProjectBody {
   name: string;
   description?: string;
+}
+
+interface ProjectParams {
+  projectId: string;
+}
+
+interface UpdateProjectStatusBody {
+  status: ProjectStatus;
 }
 
 export const projectRoutes: FastifyPluginAsync<
@@ -21,26 +33,25 @@ export const projectRoutes: FastifyPluginAsync<
       data: projects,
     };
   });
+
   app.get<{
-  Params: {
-    projectId: string;
-  };
-}>("/:projectId", async (request, reply) => {
-  const project = await options.repository.findById(
-    request.params.projectId,
-  );
+    Params: ProjectParams;
+  }>("/:projectId", async (request, reply) => {
+    const project = await options.repository.findById(
+      request.params.projectId,
+    );
 
-  if (!project) {
-    return reply.code(404).send({
-      error: "PROJECT_NOT_FOUND",
-      message: "Project not found.",
-    });
-  }
+    if (!project) {
+      return reply.code(404).send({
+        error: "PROJECT_NOT_FOUND",
+        message: "Project not found.",
+      });
+    }
 
-  return {
-    data: project,
-  };
-});
+    return {
+      data: project,
+    };
+  });
 
   app.post<{
     Body: CreateProjectBody;
@@ -87,6 +98,45 @@ export const projectRoutes: FastifyPluginAsync<
       return reply.code(201).send({
         data: project,
       });
+    },
+  );
+
+  app.patch<{
+    Params: ProjectParams;
+    Body: UpdateProjectStatusBody;
+  }>(
+    "/:projectId/status",
+    {
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["status"],
+          properties: {
+            status: {
+              type: "string",
+              enum: [...PROJECT_STATUSES],
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const project = await options.repository.updateStatus(
+        request.params.projectId,
+        request.body.status,
+      );
+
+      if (!project) {
+        return reply.code(404).send({
+          error: "PROJECT_NOT_FOUND",
+          message: "Project not found.",
+        });
+      }
+
+      return {
+        data: project,
+      };
     },
   );
 };

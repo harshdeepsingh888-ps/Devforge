@@ -225,3 +225,104 @@ test("POST /api/projects rejects an unknown property", async (t) => {
 
   assert.equal(response.statusCode, 400);
 });
+test("PATCH /api/projects/:projectId/status updates the project status", async (t) => {
+  const repository = new InMemoryProjectRepository();
+
+  const createdProject = await repository.create({
+    name: "DevForge",
+  });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    projectRepository: repository,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "PATCH",
+    url: `/api/projects/${createdProject.id}/status`,
+    payload: {
+      status: "PAUSED",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+
+  const body = response.json<{
+    data: {
+      id: string;
+      status: string;
+      createdAt: string;
+      updatedAt: string;
+    };
+  }>();
+
+  assert.equal(body.data.id, createdProject.id);
+  assert.equal(body.data.status, "PAUSED");
+  assert.equal(body.data.createdAt, createdProject.createdAt);
+  assert.ok(
+    Date.parse(body.data.updatedAt) >=
+      Date.parse(createdProject.updatedAt),
+  );
+});
+
+test("PATCH /api/projects/:projectId/status returns 404 for an unknown project", async (t) => {
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    projectRepository: new InMemoryProjectRepository(),
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "PATCH",
+    url: "/api/projects/unknown-project-id/status",
+    payload: {
+      status: "PAUSED",
+    },
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.deepEqual(response.json(), {
+    error: "PROJECT_NOT_FOUND",
+    message: "Project not found.",
+  });
+});
+
+test("PATCH /api/projects/:projectId/status rejects an invalid status", async (t) => {
+  const repository = new InMemoryProjectRepository();
+
+  const createdProject = await repository.create({
+    name: "DevForge",
+  });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    projectRepository: repository,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "PATCH",
+    url: `/api/projects/${createdProject.id}/status`,
+    payload: {
+      status: "COMPLETED",
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+});

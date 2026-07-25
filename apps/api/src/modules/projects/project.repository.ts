@@ -3,12 +3,17 @@
 import type {
   CreateProjectInput,
   Project,
+  ProjectStatus,
 } from "./project.types.js";
 
 export interface ProjectRepository {
   create(input: CreateProjectInput): Promise<Project>;
   findAll(): Promise<Project[]>;
   findById(projectId: string): Promise<Project | null>;
+  updateStatus(
+    projectId: string,
+    status: ProjectStatus,
+  ): Promise<Project | null>;
 }
 
 export class InMemoryProjectRepository
@@ -43,5 +48,26 @@ export class InMemoryProjectRepository
     projectId: string,
   ): Promise<Project | null> {
     return this.projects.get(projectId) ?? null;
+  }
+
+  async updateStatus(
+    projectId: string,
+    status: ProjectStatus,
+  ): Promise<Project | null> {
+    const project = this.projects.get(projectId);
+
+    if (!project) {
+      return null;
+    }
+
+    const updatedProject: Project = {
+      ...project,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.projects.set(projectId, updatedProject);
+
+    return updatedProject;
   }
 }

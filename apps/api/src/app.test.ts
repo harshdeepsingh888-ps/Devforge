@@ -5,7 +5,9 @@ import { buildApp } from "./app.js";
 
 test("GET /health returns the API health status", async (t) => {
   const app = buildApp({
-    logger: false,
+    serverOptions: {
+      logger: false,
+    },
   });
 
   t.after(async () => {

@@ -202,3 +202,19 @@ test("oversized request bodies return a safe 413 response", async (t) => {
     false,
   );
 });
+
+test("GET /ready returns the API readiness status", async () => {
+  const app = buildApp();
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/ready",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    status: "ready",
+  });
+
+  await app.close();
+});

@@ -11,6 +11,7 @@ import {
   type ProjectRepository,
 } from "./modules/projects/project.repository.js";
 import { projectRoutes } from "./modules/projects/project.routes.js";
+import { readinessRoutes } from "./routes/readiness.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -126,6 +127,7 @@ export function buildApp(
     prefix: "/api/projects",
     repository: projectRepository,
   });
+  void app.register(readinessRoutes);
 
   return app;
 }

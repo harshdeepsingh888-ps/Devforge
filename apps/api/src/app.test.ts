@@ -1,7 +1,10 @@
 ﻿import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildApp } from "./app.js";
+import {
+  API_BODY_LIMIT_BYTES,
+  buildApp,
+} from "./app.js";
 import { InMemoryProjectRepository } from "./modules/projects/project.repository.js";
 
 test("GET /health returns the API health status", async (t) => {
@@ -124,6 +127,78 @@ test("unexpected repository errors return a safe 500 response", async (t) => {
     response.body.includes(
       "Database connection failed",
     ),
+    false,
+  );
+});
+test("responses include defensive security headers", async (t) => {
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/health",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.headers["x-content-type-options"],
+    "nosniff",
+  );
+  assert.equal(
+    response.headers["x-frame-options"],
+    "SAMEORIGIN",
+  );
+  assert.ok(response.headers["content-security-policy"]);
+  assert.ok(response.headers["referrer-policy"]);
+});
+
+test("oversized request bodies return a safe 413 response", async (t) => {
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const oversizedName = "a".repeat(
+    API_BODY_LIMIT_BYTES + 1,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/projects",
+    payload: {
+      name: oversizedName,
+    },
+  });
+
+  assert.equal(response.statusCode, 413);
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(body.error, "PAYLOAD_TOO_LARGE");
+  assert.equal(
+    body.message,
+    "Request payload exceeds the allowed size.",
+  );
+  assert.ok(body.requestId);
+
+  assert.equal(
+    response.body.includes(oversizedName),
     false,
   );
 });

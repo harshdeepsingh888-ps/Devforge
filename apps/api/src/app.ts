@@ -1,5 +1,5 @@
 ﻿import helmet from "@fastify/helmet";
-
+import rateLimit from "@fastify/rate-limit";
 import Fastify, {
   LogController,
   type FastifyInstance,
@@ -50,44 +50,37 @@ export function buildApp(
   options: BuildAppOptions = {},
 ): FastifyInstance {
   const app = Fastify({
-  logger: true,
-  logController: new LogController({
-  disableRequestLogging: true,
-}),
-  bodyLimit: API_BODY_LIMIT_BYTES,
-  ajv: {
-    customOptions: {
-      removeAdditional: false,
+    logger: true,
+    logController: new LogController({
+      disableRequestLogging: true,
+    }),
+    bodyLimit: API_BODY_LIMIT_BYTES,
+    ajv: {
+      customOptions: {
+        removeAdditional: false,
+      },
     },
-  },
-  ...options.serverOptions,
-});
-
-  void app.register(helmet);
+    ...options.serverOptions,
+  });
 
   const projectRepository =
     options.projectRepository ??
     new InMemoryProjectRepository();
 
-  app.get("/health", async () => {
-    return {
-      status: "ok",
-      service: "devforge-api",
-      timestamp: new Date().toISOString(),
-    };
-  });
+  void app.register(helmet);
+
   app.addHook("onResponse", async (request, reply) => {
-  request.log.info(
-    {
-      requestId: request.id,
-      method: request.method,
-      url: request.url,
-      statusCode: reply.statusCode,
-      durationMs: reply.elapsedTime,
-    },
-    "Request completed",
-  );
-});
+    request.log.info(
+      {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+        statusCode: reply.statusCode,
+        durationMs: reply.elapsedTime,
+      },
+      "Request completed",
+    );
+  });
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error(
@@ -111,7 +104,17 @@ export function buildApp(
     if (isHttpError(error) && error.statusCode === 413) {
       return reply.code(413).send({
         error: "PAYLOAD_TOO_LARGE",
-        message: "Request payload exceeds the allowed size.",
+        message:
+          "Request payload exceeds the allowed size.",
+        requestId: request.id,
+      });
+    }
+
+    if (isHttpError(error) && error.statusCode === 429) {
+      return reply.code(429).send({
+        error: "RATE_LIMIT_EXCEEDED",
+        message:
+          "Too many requests. Please try again later.",
         requestId: request.id,
       });
     }
@@ -123,11 +126,36 @@ export function buildApp(
     });
   });
 
-  void app.register(projectRoutes, {
-    prefix: "/api/projects",
-    repository: projectRepository,
+  /*
+   * Register the rate limiter and protected routes inside
+   * the same Fastify plugin scope. This ensures the rate-limit
+   * hook applies to every route declared in this scope.
+   */
+  void app.register(async function protectedRoutes(
+    protectedApp,
+  ) {
+    await protectedApp.register(rateLimit, {
+      global: true,
+      max: 100,
+      timeWindow: "1 minute",
+      keyGenerator: (request) => request.ip,
+    });
+
+    protectedApp.get("/health", async () => {
+      return {
+        status: "ok",
+        service: "devforge-api",
+        timestamp: new Date().toISOString(),
+      };
+    });
+
+    await protectedApp.register(readinessRoutes);
+
+    await protectedApp.register(projectRoutes, {
+      prefix: "/api/projects",
+      repository: projectRepository,
+    });
   });
-  void app.register(readinessRoutes);
 
   return app;
 }

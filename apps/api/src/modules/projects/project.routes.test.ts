@@ -326,3 +326,24 @@ test("PATCH /api/projects/:projectId/status rejects an invalid status", async (t
 
   assert.equal(response.statusCode, 400);
 });
+test("rate limiting returns 429 after too many requests", async () => {
+  const app = buildApp();
+
+  for (let requestNumber = 1; requestNumber <= 100; requestNumber += 1) {
+    const response = await app.inject({
+      method: "GET",
+      url: "/health",
+    });
+
+    assert.equal(response.statusCode, 200);
+  }
+
+  const limitedResponse = await app.inject({
+    method: "GET",
+    url: "/health",
+  });
+
+  assert.equal(limitedResponse.statusCode, 429);
+
+  await app.close();
+});

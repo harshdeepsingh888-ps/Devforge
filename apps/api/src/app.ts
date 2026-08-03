@@ -1,5 +1,7 @@
 ﻿import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import Fastify, {
   LogController,
   type FastifyInstance,
@@ -67,6 +69,38 @@ export function buildApp(
     options.projectRepository ??
     new InMemoryProjectRepository();
 
+  void app.register(swagger, {
+    openapi: {
+      openapi: "3.0.3",
+      info: {
+        title: "DevForge API",
+        description:
+          "Backend API for the DevForge developer operating system.",
+        version: "0.1.0",
+      },
+      tags: [
+        {
+          name: "System",
+          description: "API health and readiness endpoints.",
+        },
+        {
+          name: "Projects",
+          description: "DevForge project management endpoints.",
+        },
+      ],
+    },
+  });
+
+  void app.register(swaggerUi, {
+    routePrefix: "/docs",
+    uiConfig: {
+      docExpansion: "list",
+      deepLinking: true,
+    },
+    staticCSP: true,
+    transformStaticCSP: (header) => header,
+  });
+
   void app.register(helmet);
 
   app.addHook("onResponse", async (request, reply) => {
@@ -126,11 +160,6 @@ export function buildApp(
     });
   });
 
-  /*
-   * Register the rate limiter and protected routes inside
-   * the same Fastify plugin scope. This ensures the rate-limit
-   * hook applies to every route declared in this scope.
-   */
   void app.register(async function protectedRoutes(
     protectedApp,
   ) {
@@ -141,13 +170,22 @@ export function buildApp(
       keyGenerator: (request) => request.ip,
     });
 
-    protectedApp.get("/health", async () => {
-      return {
+    protectedApp.get(
+      "/health",
+      {
+        schema: {
+          tags: ["System"],
+          summary: "Check API health",
+          description:
+            "Confirms that the DevForge API process is running.",
+        },
+      },
+      async () => ({
         status: "ok",
         service: "devforge-api",
         timestamp: new Date().toISOString(),
-      };
-    });
+      }),
+    );
 
     await protectedApp.register(readinessRoutes);
 

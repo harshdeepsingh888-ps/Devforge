@@ -12,44 +12,64 @@ enum WorkspaceRole {
   MEMBER
 }
 
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
 model User {
-  id            String @id @default(cuid())
-  email         String @unique
-  passwordHash  String
-  displayName   String
-  avatarUrl     String?
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
 
-  memberships   WorkspaceMember[]
+  memberships WorkspaceMember[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Workspace {
-  id            String @id @default(cuid())
-  name          String
-  slug          String @unique
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
 
-  members       WorkspaceMember[]
+  members  WorkspaceMember[]
+  projects Project[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model WorkspaceMember {
-  workspaceId   String
-  userId        String
+  workspaceId String
+  userId      String
+  role        WorkspaceRole
+  joinedAt    DateTime @default(now())
 
-  role          WorkspaceRole
-
-  joinedAt      DateTime @default(now())
-
-  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([workspaceId, userId])
-
   @@index([userId])
+  @@index([workspaceId])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, updatedAt])
 }

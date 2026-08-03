@@ -1,10 +1,10 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 
 import type {
   AuthUser,
   CreateUserInput,
-} from "../auth.types.js";
-import type { UserRepository } from "./user.repository.js";
+} from "../../auth.types.js";
+import type { UserRepository } from "../user.repository.js";
 
 export class InMemoryUserRepository
   implements UserRepository

@@ -1,8 +1,8 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
-import { InMemoryUserRepository } from "../repositories/in-memory-user.repository.js";
+import { InMemoryUserRepository } from "../repositories/memory/in-memory-user.repository.js";
 import type { PasswordService } from "./password.service.js";
 import { RegistrationService } from "./registration.service.js";
 

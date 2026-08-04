@@ -4,31 +4,10 @@ import type {
   AuthUser,
   CreateUserInput,
 } from "../../auth.types.js";
+import { toAuthUser } from "../../mappers/user.mapper.js";
 import type { UserRepository } from "../user.repository.js";
 
 type UserDatabaseClient = Pick<PrismaClient, "user">;
-
-interface PersistedUser {
-  id: string;
-  email: string;
-  passwordHash: string;
-  displayName: string;
-  avatarUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-function mapPersistedUser(user: PersistedUser): AuthUser {
-  return {
-    id: user.id,
-    email: user.email,
-    passwordHash: user.passwordHash,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  };
-}
 
 export class PrismaUserRepository
   implements UserRepository
@@ -48,7 +27,7 @@ export class PrismaUserRepository
       },
     });
 
-    return mapPersistedUser(user);
+    return toAuthUser(user);
   }
 
   async findByEmail(
@@ -60,7 +39,7 @@ export class PrismaUserRepository
       },
     });
 
-    return user ? mapPersistedUser(user) : null;
+    return user ? toAuthUser(user) : null;
   }
 
   async findById(
@@ -72,6 +51,6 @@ export class PrismaUserRepository
       },
     });
 
-    return user ? mapPersistedUser(user) : null;
+    return user ? toAuthUser(user) : null;
   }
 }

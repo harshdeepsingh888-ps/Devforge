@@ -1,11 +1,16 @@
 import type {
+  AuthUser,
+} from "../../auth.types.js";
+import type {
   AuthenticationConfiguration,
   AuthenticationResult,
   LoginInput,
   RegisterInput,
 } from "../../authentication.types.js";
-import { InvalidCredentialsError } from "../../authentication.errors.js";
-import type { PublicAuthUser } from "../../auth.types.js";
+import {
+  InvalidCredentialsError,
+} from "../../authentication.errors.js";
+import { toPublicAuthUser } from "../../mappers/public-user.mapper.js";
 import type { SessionRepository } from "../../repositories/session/session.repository.js";
 import type { UserRepository } from "../../repositories/user.repository.js";
 import type { AccessTokenService } from "../../security/jwt.service.js";
@@ -28,8 +33,7 @@ export class AuthenticationService {
   private readonly now: () => Date;
 
   constructor(
-    private readonly dependencies:
-      AuthenticationServiceDependencies,
+    private readonly dependencies: AuthenticationServiceDependencies,
   ) {
     if (
       dependencies.configuration
@@ -41,13 +45,23 @@ export class AuthenticationService {
     }
 
     this.now =
-      dependencies.now ?? (() => new Date());
+      dependencies.now ??
+      (() => new Date());
   }
 
   async register(
-    _input: RegisterInput,
+    input: RegisterInput,
   ): Promise<AuthenticationResult> {
-    throw new Error("Not implemented.");
+    const user =
+      await this.dependencies.registration.register({
+        email: input.email,
+        password: input.password,
+        displayName: input.displayName,
+      });
+
+    return this.createAuthenticatedSession(
+      user,
+    );
   }
 
   async login(
@@ -67,16 +81,23 @@ export class AuthenticationService {
     }
 
     const passwordIsValid =
-      await this.dependencies.passwords
-        .verifyPassword(
-          user.passwordHash,
-          input.password,
-        );
+      await this.dependencies.passwords.verifyPassword(
+        user.passwordHash,
+        input.password,
+      );
 
     if (!passwordIsValid) {
       throw new InvalidCredentialsError();
     }
 
+    return this.createAuthenticatedSession(
+      user,
+    );
+  }
+
+  private async createAuthenticatedSession(
+  user: AuthUser,
+): Promise<AuthenticationResult> {
     const refreshToken =
       this.dependencies.refreshTokens.generate();
 
@@ -90,8 +111,10 @@ export class AuthenticationService {
     const session =
       await this.dependencies.sessions.create({
         userId: user.id,
-        refreshTokenHash: refreshToken.hash,
-        expiresAt: expiresAt.toISOString(),
+        refreshTokenHash:
+          refreshToken.hash,
+        expiresAt:
+          expiresAt.toISOString(),
       });
 
     const accessToken =
@@ -103,22 +126,8 @@ export class AuthenticationService {
     return {
       user: toPublicAuthUser(user),
       accessToken,
-      refreshToken: refreshToken.token,
+      refreshToken:
+        refreshToken.token,
     };
   }
-}
-
-function toPublicAuthUser(
-  user: Awaited<
-    ReturnType<UserRepository["findByEmail"]>
-  > & {},
-): PublicAuthUser {
-  return {
-    id: user.id,
-    email: user.email,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-  };
 }

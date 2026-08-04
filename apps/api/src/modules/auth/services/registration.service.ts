@@ -1,5 +1,5 @@
 import type {
-  PublicAuthUser,
+  AuthUser,
   RegisterUserInput,
 } from "../auth.types.js";
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
@@ -18,7 +18,7 @@ export class RegistrationService {
 
   async register(
     input: RegisterUserInput,
-  ): Promise<PublicAuthUser> {
+  ): Promise<AuthUser> {
     const email = input.email.trim().toLowerCase();
     const displayName = input.displayName.trim();
 
@@ -43,13 +43,6 @@ export class RegistrationService {
         displayName,
       });
 
-    return {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+    return user;
   }
 }

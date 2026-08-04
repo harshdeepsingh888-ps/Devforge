@@ -20,7 +20,7 @@ class FakePasswordService implements PasswordService {
   }
 }
 
-test("register normalizes user details and returns a safe user", async () => {
+test("register normalizes user details and returns the created user", async () => {
   const userRepository = new InMemoryUserRepository();
   const passwordService = new FakePasswordService();
 
@@ -38,10 +38,9 @@ test("register normalizes user details and returns a safe user", async () => {
   assert.equal(user.email, "developer@example.com");
   assert.equal(user.displayName, "Dev Forge");
   assert.equal(user.avatarUrl, null);
-
   assert.equal(
-    "passwordHash" in user,
-    false,
+    user.passwordHash,
+    "hashed:StrongPassword123",
   );
 });
 

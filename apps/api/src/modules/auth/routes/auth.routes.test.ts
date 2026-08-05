@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { buildApp } from "../../../app.js";
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
+import { InvalidCredentialsError } from "../authentication.errors.js";
 import type {
   AuthenticationResult,
   LoginInput,
@@ -26,14 +27,20 @@ const AUTHENTICATION_RESULT:
     refreshToken: "refresh-token",
   };
 
+interface FakeAuthenticationServiceOptions {
+  registerError?: Error;
+  loginError?: Error;
+}
+
 class FakeAuthenticationService
   implements AuthenticationServiceContract
 {
   registerCalls: RegisterInput[] = [];
+  loginCalls: LoginInput[] = [];
 
   constructor(
-    private readonly registerError?:
-      Error,
+    private readonly options:
+      FakeAuthenticationServiceOptions = {},
   ) {}
 
   async register(
@@ -41,19 +48,23 @@ class FakeAuthenticationService
   ): Promise<AuthenticationResult> {
     this.registerCalls.push(input);
 
-    if (this.registerError) {
-      throw this.registerError;
+    if (this.options.registerError) {
+      throw this.options.registerError;
     }
 
     return AUTHENTICATION_RESULT;
   }
 
   async login(
-    _input: LoginInput,
+    input: LoginInput,
   ): Promise<AuthenticationResult> {
-    throw new Error(
-      "Login is not implemented by this test fake.",
-    );
+    this.loginCalls.push(input);
+
+    if (this.options.loginError) {
+      throw this.options.loginError;
+    }
+
+    return AUTHENTICATION_RESULT;
   }
 }
 
@@ -83,6 +94,7 @@ test("POST /api/auth/register creates an authenticated account", async (t) => {
   });
 
   assert.equal(response.statusCode, 201);
+
   assert.deepEqual(
     response.json(),
     AUTHENTICATION_RESULT,
@@ -92,12 +104,9 @@ test("POST /api/auth/register creates an authenticated account", async (t) => {
     authenticationService.registerCalls,
     [
       {
-        email:
-          "developer@example.com",
-        password:
-          "StrongPassword123",
-        displayName:
-          "Dev Forge",
+        email: "developer@example.com",
+        password: "StrongPassword123",
+        displayName: "Dev Forge",
       },
     ],
   );
@@ -113,9 +122,10 @@ test("POST /api/auth/register creates an authenticated account", async (t) => {
 
 test("POST /api/auth/register returns 409 for an existing email", async (t) => {
   const authenticationService =
-    new FakeAuthenticationService(
-      new EmailAlreadyRegisteredError(),
-    );
+    new FakeAuthenticationService({
+      registerError:
+        new EmailAlreadyRegisteredError(),
+    });
 
   const app = buildApp({
     serverOptions: {
@@ -186,8 +196,7 @@ test("POST /api/auth/register rejects an invalid request body", async (t) => {
 
   assert.equal(response.statusCode, 400);
   assert.equal(
-    authenticationService.registerCalls
-      .length,
+    authenticationService.registerCalls.length,
     0,
   );
 
@@ -238,8 +247,186 @@ test("POST /api/auth/register rejects unknown properties", async (t) => {
 
   assert.equal(response.statusCode, 400);
   assert.equal(
-    authenticationService.registerCalls
-      .length,
+    authenticationService.registerCalls.length,
+    0,
+  );
+});
+
+test("POST /api/auth/login creates an authenticated session", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: {
+      email: "developer@example.com",
+      password: "StrongPassword123",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+
+  assert.deepEqual(
+    response.json(),
+    AUTHENTICATION_RESULT,
+  );
+
+  assert.deepEqual(
+    authenticationService.loginCalls,
+    [
+      {
+        email: "developer@example.com",
+        password: "StrongPassword123",
+      },
+    ],
+  );
+
+  assert.equal(
+    "passwordHash" in
+      response.json<{
+        user: Record<string, unknown>;
+      }>().user,
+    false,
+  );
+});
+
+test("POST /api/auth/login returns 401 for invalid credentials", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService({
+      loginError:
+        new InvalidCredentialsError(),
+    });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: {
+      email: "developer@example.com",
+      password: "IncorrectPassword",
+    },
+  });
+
+  assert.equal(response.statusCode, 401);
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(
+    body.error,
+    "INVALID_CREDENTIALS",
+  );
+
+  assert.equal(
+    body.message,
+    "Invalid email or password.",
+  );
+
+  assert.ok(body.requestId);
+});
+
+test("POST /api/auth/login rejects an invalid request body", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: {
+      email: "not-an-email",
+      password: "short",
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(
+    authenticationService.loginCalls.length,
+    0,
+  );
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(
+    body.error,
+    "VALIDATION_ERROR",
+  );
+
+  assert.equal(
+    body.message,
+    "Request validation failed.",
+  );
+
+  assert.ok(body.requestId);
+});
+
+test("POST /api/auth/login rejects unknown properties", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/login",
+    payload: {
+      email: "developer@example.com",
+      password: "StrongPassword123",
+      rememberMe: true,
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(
+    authenticationService.loginCalls.length,
     0,
   );
 });

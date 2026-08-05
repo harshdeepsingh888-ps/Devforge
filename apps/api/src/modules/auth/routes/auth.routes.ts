@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
+import { InvalidCredentialsError } from "../authentication.errors.js";
 import type {
   LoginInput,
   RegisterInput,
@@ -19,6 +20,10 @@ export interface AuthRoutesOptions {
 
 interface RegisterRoute {
   Body: RegisterInput;
+}
+
+interface LoginRoute {
+  Body: LoginInput;
 }
 
 const authenticationResultSchema = {
@@ -106,7 +111,7 @@ const registerSchema = {
   tags: ["Authentication"],
   summary: "Register a user",
   description:
-    "Creates a user account and returns a new authenticated session.",
+    "Creates a new user account and immediately authenticates the user.",
   body: {
     type: "object",
     additionalProperties: false,
@@ -141,6 +146,38 @@ const registerSchema = {
   },
 } as const;
 
+const loginSchema = {
+  tags: ["Authentication"],
+  summary: "Authenticate a user",
+  description:
+    "Authenticates an existing user and returns a new authenticated session.",
+  body: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "email",
+      "password",
+    ],
+    properties: {
+      email: {
+        type: "string",
+        format: "email",
+        maxLength: 254,
+      },
+      password: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+      },
+    },
+  },
+  response: {
+    200: authenticationResultSchema,
+    400: errorResponseSchema,
+    401: errorResponseSchema,
+  },
+} as const;
+
 export const authRoutes: FastifyPluginAsync<
   AuthRoutesOptions
 > = async (app, options) => {
@@ -163,6 +200,36 @@ export const authRoutes: FastifyPluginAsync<
           EmailAlreadyRegisteredError
         ) {
           return reply.code(409).send({
+            error: error.code,
+            message: error.message,
+            requestId: request.id,
+          });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  app.post<LoginRoute>(
+    "/login",
+    {
+      schema: loginSchema,
+    },
+    async (request, reply) => {
+      try {
+        const result =
+          await options.authenticationService.login(
+            request.body,
+          );
+
+        return reply.code(200).send(result);
+      } catch (error) {
+        if (
+          error instanceof
+          InvalidCredentialsError
+        ) {
+          return reply.code(401).send({
             error: error.code,
             message: error.message,
             requestId: request.id,

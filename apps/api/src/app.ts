@@ -8,8 +8,10 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 
-import { authRoutes } from "./modules/auth/routes/auth.routes.js";
-import type { AuthenticationService } from "./modules/auth/services/authentication/authentication.service.js";
+import {
+  authRoutes,
+  type AuthenticationServiceContract,
+} from "./modules/auth/routes/auth.routes.js";
 import {
   InMemoryProjectRepository,
   type ProjectRepository,
@@ -48,7 +50,8 @@ function isHttpError(
 export interface BuildAppOptions {
   serverOptions?: FastifyServerOptions;
   projectRepository?: ProjectRepository;
-  authenticationService?: AuthenticationService;
+  authenticationService?:
+  AuthenticationServiceContract;
 }
 
 export function buildApp(

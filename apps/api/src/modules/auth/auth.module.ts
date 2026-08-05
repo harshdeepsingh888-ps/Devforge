@@ -1,8 +1,4 @@
-import type {
-  FastifyPluginAsync,
-} from "fastify";
-
-import { env } from "../../config/env.js";
+import type { AccessTokenConfiguration } from "./security/token.types.js";
 import { PrismaUserRepository } from "./repositories/prisma/prisma-user.repository.js";
 import { PrismaSessionRepository } from "./repositories/session/prisma-session.repository.js";
 import { JwtAccessTokenService } from "./security/jwt.service.js";
@@ -11,55 +7,41 @@ import { AuthenticationService } from "./services/authentication/authentication.
 import { Argon2PasswordService } from "./services/password.service.js";
 import { RegistrationService } from "./services/registration.service.js";
 
-export interface AuthModuleOptions {
-  authenticationService?:
-    AuthenticationService;
+export interface AuthModuleConfiguration {
+  accessToken: AccessTokenConfiguration;
+  refreshTokenExpiresInSeconds: number;
 }
 
-export const authModule:
-  FastifyPluginAsync<AuthModuleOptions> =
-  async (_app, options) => {
-    const users =
-      new PrismaUserRepository();
+export function createAuthenticationService(
+  configuration: AuthModuleConfiguration,
+): AuthenticationService {
+  const users = new PrismaUserRepository();
+  const sessions = new PrismaSessionRepository();
+  const passwords = new Argon2PasswordService();
 
-    const sessions =
-      new PrismaSessionRepository();
+  const registration = new RegistrationService({
+    userRepository: users,
+    passwordService: passwords,
+  });
 
-    const passwords =
-      new Argon2PasswordService();
+  const refreshTokens =
+    new Sha256RefreshTokenService();
 
-    const registration =
-      new RegistrationService({
-        userRepository: users,
-        passwordService: passwords,
-      });
+  const accessTokens =
+    new JwtAccessTokenService(
+      configuration.accessToken,
+    );
 
-    const refreshTokens =
-      new Sha256RefreshTokenService();
-
-    const accessTokens =
-      new JwtAccessTokenService(
-        env.authentication.accessToken,
-      );
-
-    const authenticationService =
-      options.authenticationService ??
-      new AuthenticationService({
-        users,
-        passwords,
-        registration,
-        sessions,
-        refreshTokens,
-        accessTokens,
-        configuration: {
-          refreshTokenExpiresInSeconds:
-            env.authentication
-              .refreshTokenExpiresInSeconds,
-        },
-      });
-
-    void authenticationService;
-
-    // Authentication routes will be
-    // registered in the next step.
-  };
+  return new AuthenticationService({
+    users,
+    passwords,
+    registration,
+    sessions,
+    refreshTokens,
+    accessTokens,
+    configuration: {
+      refreshTokenExpiresInSeconds:
+        configuration.refreshTokenExpiresInSeconds,
+    },
+  });
+}

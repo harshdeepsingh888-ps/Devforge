@@ -8,6 +8,8 @@ import Fastify, {
   type FastifyServerOptions,
 } from "fastify";
 
+import { authRoutes } from "./modules/auth/routes/auth.routes.js";
+import type { AuthenticationService } from "./modules/auth/services/authentication/authentication.service.js";
 import {
   InMemoryProjectRepository,
   type ProjectRepository,
@@ -46,6 +48,7 @@ function isHttpError(
 export interface BuildAppOptions {
   serverOptions?: FastifyServerOptions;
   projectRepository?: ProjectRepository;
+  authenticationService?: AuthenticationService;
 }
 
 export function buildApp(
@@ -81,11 +84,18 @@ export function buildApp(
       tags: [
         {
           name: "System",
-          description: "API health and readiness endpoints.",
+          description:
+            "API health and readiness endpoints.",
+        },
+        {
+          name: "Authentication",
+          description:
+            "User registration and authentication endpoints.",
         },
         {
           name: "Projects",
-          description: "DevForge project management endpoints.",
+          description:
+            "DevForge project management endpoints.",
         },
       ],
     },
@@ -103,97 +113,134 @@ export function buildApp(
 
   void app.register(helmet);
 
-  app.addHook("onResponse", async (request, reply) => {
-    request.log.info(
-      {
-        requestId: request.id,
-        method: request.method,
-        url: request.url,
-        statusCode: reply.statusCode,
-        durationMs: reply.elapsedTime,
-      },
-      "Request completed",
-    );
-  });
-
-  app.setErrorHandler((error, request, reply) => {
-    request.log.error(
-      {
-        err: error,
-        requestId: request.id,
-        method: request.method,
-        url: request.url,
-      },
-      "Request error",
-    );
-
-    if (isValidationError(error)) {
-      return reply.code(400).send({
-        error: "VALIDATION_ERROR",
-        message: "Request validation failed.",
-        requestId: request.id,
-      });
-    }
-
-    if (isHttpError(error) && error.statusCode === 413) {
-      return reply.code(413).send({
-        error: "PAYLOAD_TOO_LARGE",
-        message:
-          "Request payload exceeds the allowed size.",
-        requestId: request.id,
-      });
-    }
-
-    if (isHttpError(error) && error.statusCode === 429) {
-      return reply.code(429).send({
-        error: "RATE_LIMIT_EXCEEDED",
-        message:
-          "Too many requests. Please try again later.",
-        requestId: request.id,
-      });
-    }
-
-    return reply.code(500).send({
-      error: "INTERNAL_SERVER_ERROR",
-      message: "An unexpected error occurred.",
-      requestId: request.id,
-    });
-  });
-
-  void app.register(async function protectedRoutes(
-    protectedApp,
-  ) {
-    await protectedApp.register(rateLimit, {
-      global: true,
-      max: 100,
-      timeWindow: "1 minute",
-      keyGenerator: (request) => request.ip,
-    });
-
-    protectedApp.get(
-      "/health",
-      {
-        schema: {
-          tags: ["System"],
-          summary: "Check API health",
-          description:
-            "Confirms that the DevForge API process is running.",
+  app.addHook(
+    "onResponse",
+    async (request, reply) => {
+      request.log.info(
+        {
+          requestId: request.id,
+          method: request.method,
+          url: request.url,
+          statusCode: reply.statusCode,
+          durationMs: reply.elapsedTime,
         },
-      },
-      async () => ({
-        status: "ok",
-        service: "devforge-api",
-        timestamp: new Date().toISOString(),
-      }),
-    );
+        "Request completed",
+      );
+    },
+  );
 
-    await protectedApp.register(readinessRoutes);
+  app.setErrorHandler(
+    (error, request, reply) => {
+      request.log.error(
+        {
+          err: error,
+          requestId: request.id,
+          method: request.method,
+          url: request.url,
+        },
+        "Request error",
+      );
 
-    await protectedApp.register(projectRoutes, {
-      prefix: "/api/projects",
-      repository: projectRepository,
-    });
-  });
+      if (isValidationError(error)) {
+        return reply.code(400).send({
+          error: "VALIDATION_ERROR",
+          message:
+            "Request validation failed.",
+          requestId: request.id,
+        });
+      }
+
+      if (
+        isHttpError(error) &&
+        error.statusCode === 413
+      ) {
+        return reply.code(413).send({
+          error: "PAYLOAD_TOO_LARGE",
+          message:
+            "Request payload exceeds the allowed size.",
+          requestId: request.id,
+        });
+      }
+
+      if (
+        isHttpError(error) &&
+        error.statusCode === 429
+      ) {
+        return reply.code(429).send({
+          error: "RATE_LIMIT_EXCEEDED",
+          message:
+            "Too many requests. Please try again later.",
+          requestId: request.id,
+        });
+      }
+
+      return reply.code(500).send({
+        error: "INTERNAL_SERVER_ERROR",
+        message:
+          "An unexpected error occurred.",
+        requestId: request.id,
+      });
+    },
+  );
+
+  void app.register(
+    async function applicationRoutes(
+      application,
+    ) {
+      await application.register(
+        rateLimit,
+        {
+          global: true,
+          max: 100,
+          timeWindow: "1 minute",
+          keyGenerator: (request) =>
+            request.ip,
+        },
+      );
+
+      application.get(
+        "/health",
+        {
+          schema: {
+            tags: ["System"],
+            summary: "Check API health",
+            description:
+              "Confirms that the DevForge API process is running.",
+          },
+        },
+        async () => ({
+          status: "ok",
+          service: "devforge-api",
+          timestamp:
+            new Date().toISOString(),
+        }),
+      );
+
+      await application.register(
+        readinessRoutes,
+      );
+
+      if (options.authenticationService) {
+        await application.register(
+          authRoutes,
+          {
+            prefix: "/api/auth",
+            authenticationService:
+              options.authenticationService,
+          },
+        );
+      }
+
+      await application.register(
+        projectRoutes,
+        {
+          prefix: "/api/projects",
+          repository:
+            projectRepository,
+        },
+      );
+    },
+  );
 
   return app;
 }

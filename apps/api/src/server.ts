@@ -1,7 +1,20 @@
 ﻿import { buildApp } from "./app.js";
-import { env } from "./config/env.js";
+import {
+  createAuthenticationService,
+} from "./modules/auth/auth.module.js";
+import {
+  env,
+  getAuthenticationConfiguration,
+} from "./config/env.js";
 
-const app = buildApp();
+const authenticationService =
+  createAuthenticationService(
+    getAuthenticationConfiguration(),
+  );
+
+const app = buildApp({
+  authenticationService,
+});
 
 async function startServer(): Promise<void> {
   try {
@@ -15,8 +28,13 @@ async function startServer(): Promise<void> {
   }
 }
 
-async function shutdown(signal: string): Promise<void> {
-  app.log.info({ signal }, "Shutting down DevForge API");
+async function shutdown(
+  signal: string,
+): Promise<void> {
+  app.log.info(
+    { signal },
+    "Shutting down DevForge API",
+  );
 
   try {
     await app.close();

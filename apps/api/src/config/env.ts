@@ -1,3 +1,5 @@
+import type { AuthModuleConfiguration } from "../modules/auth/auth.module.js";
+
 const DEFAULT_PORT = 5000;
 const DEFAULT_HOST = "0.0.0.0";
 
@@ -67,23 +69,6 @@ function requireEnvironmentVariable(
   return normalizedValue;
 }
 
-const jwtAccessTokenSecret =
-  requireEnvironmentVariable(
-    "JWT_ACCESS_TOKEN_SECRET",
-    process.env.JWT_ACCESS_TOKEN_SECRET,
-  );
-
-if (
-  Buffer.byteLength(
-    jwtAccessTokenSecret,
-    "utf8",
-  ) < 32
-) {
-  throw new Error(
-    "JWT_ACCESS_TOKEN_SECRET must contain at least 32 bytes.",
-  );
-}
-
 export const env = {
   port: parsePort(process.env.PORT),
 
@@ -95,20 +80,40 @@ export const env = {
     "DATABASE_URL",
     process.env.DATABASE_URL,
   ),
+};
 
-  authentication: {
+export function getAuthenticationConfiguration():
+  AuthModuleConfiguration {
+  const secret =
+    requireEnvironmentVariable(
+      "JWT_ACCESS_TOKEN_SECRET",
+      process.env.JWT_ACCESS_TOKEN_SECRET,
+    );
+
+  if (
+    Buffer.byteLength(secret, "utf8") <
+    32
+  ) {
+    throw new Error(
+      "JWT_ACCESS_TOKEN_SECRET must contain at least 32 bytes.",
+    );
+  }
+
+  return {
     accessToken: {
-      secret: jwtAccessTokenSecret,
+      secret,
 
-      issuer: requireEnvironmentVariable(
-        "JWT_ISSUER",
-        process.env.JWT_ISSUER,
-      ),
+      issuer:
+        requireEnvironmentVariable(
+          "JWT_ISSUER",
+          process.env.JWT_ISSUER,
+        ),
 
-      audience: requireEnvironmentVariable(
-        "JWT_AUDIENCE",
-        process.env.JWT_AUDIENCE,
-      ),
+      audience:
+        requireEnvironmentVariable(
+          "JWT_AUDIENCE",
+          process.env.JWT_AUDIENCE,
+        ),
 
       expiresInSeconds:
         parsePositiveInteger(
@@ -126,5 +131,5 @@ export const env = {
           .REFRESH_TOKEN_EXPIRES_IN_SECONDS,
         DEFAULT_REFRESH_TOKEN_EXPIRES_IN_SECONDS,
       ),
-  },
-};
+  };
+}

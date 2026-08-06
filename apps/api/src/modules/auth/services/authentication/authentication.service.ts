@@ -14,7 +14,10 @@ import { toPublicAuthUser } from "../../mappers/public-user.mapper.js";
 import type { SessionRepository } from "../../repositories/session/session.repository.js";
 import type { UserRepository } from "../../repositories/user.repository.js";
 import type { AccessTokenService } from "../../security/jwt.service.js";
-import type { RefreshTokenService } from "../../security/refresh-token.service.js";
+import type {
+  RefreshTokenPair,
+  RefreshTokenService,
+} from "../../security/refresh-token.service.js";
 import type { PasswordService } from "../password.service.js";
 import type { RegistrationService } from "../registration.service.js";
 
@@ -29,11 +32,17 @@ export interface AuthenticationServiceDependencies {
   now?: () => Date;
 }
 
+interface CreatedSessionCredentials {
+  sessionId: string;
+  refreshToken: RefreshTokenPair;
+}
+
 export class AuthenticationService {
   private readonly now: () => Date;
 
   constructor(
-    private readonly dependencies: AuthenticationServiceDependencies,
+    private readonly dependencies:
+      AuthenticationServiceDependencies,
   ) {
     if (
       dependencies.configuration
@@ -59,8 +68,12 @@ export class AuthenticationService {
         displayName: input.displayName,
       });
 
-    return this.createAuthenticatedSession(
+    const credentials =
+      await this.createSession(user.id);
+
+    return this.issueAuthenticationResult(
       user,
+      credentials,
     );
   }
 
@@ -90,14 +103,18 @@ export class AuthenticationService {
       throw new InvalidCredentialsError();
     }
 
-    return this.createAuthenticatedSession(
+    const credentials =
+      await this.createSession(user.id);
+
+    return this.issueAuthenticationResult(
       user,
+      credentials,
     );
   }
 
-  private async createAuthenticatedSession(
-  user: AuthUser,
-): Promise<AuthenticationResult> {
+  private async createSession(
+    userId: string,
+  ): Promise<CreatedSessionCredentials> {
     const refreshToken =
       this.dependencies.refreshTokens.generate();
 
@@ -110,24 +127,35 @@ export class AuthenticationService {
 
     const session =
       await this.dependencies.sessions.create({
-        userId: user.id,
+        userId,
         refreshTokenHash:
           refreshToken.hash,
         expiresAt:
           expiresAt.toISOString(),
       });
 
+    return {
+      sessionId: session.id,
+      refreshToken,
+    };
+  }
+
+  private async issueAuthenticationResult(
+    user: AuthUser,
+    credentials: CreatedSessionCredentials,
+  ): Promise<AuthenticationResult> {
     const accessToken =
       await this.dependencies.accessTokens.issue({
         userId: user.id,
-        sessionId: session.id,
+        sessionId:
+          credentials.sessionId,
       });
 
     return {
       user: toPublicAuthUser(user),
       accessToken,
       refreshToken:
-        refreshToken.token,
+        credentials.refreshToken.token,
     };
   }
 }

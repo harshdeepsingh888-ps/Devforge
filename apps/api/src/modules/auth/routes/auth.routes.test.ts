@@ -3,10 +3,15 @@ import test from "node:test";
 
 import { buildApp } from "../../../app.js";
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
-import { InvalidCredentialsError } from "../authentication.errors.js";
+import {
+  InvalidCredentialsError,
+  InvalidRefreshTokenError,
+  SessionExpiredError,
+} from "../authentication.errors.js";
 import type {
   AuthenticationResult,
   LoginInput,
+  RefreshInput,
   RegisterInput,
 } from "../authentication.types.js";
 import type { AuthenticationServiceContract } from "./auth.routes.js";
@@ -30,6 +35,7 @@ const AUTHENTICATION_RESULT:
 interface FakeAuthenticationServiceOptions {
   registerError?: Error;
   loginError?: Error;
+  refreshError?: Error;
 }
 
 class FakeAuthenticationService
@@ -37,6 +43,7 @@ class FakeAuthenticationService
 {
   registerCalls: RegisterInput[] = [];
   loginCalls: LoginInput[] = [];
+    refreshCalls: RefreshInput[] = [];
 
   constructor(
     private readonly options:
@@ -62,6 +69,18 @@ class FakeAuthenticationService
 
     if (this.options.loginError) {
       throw this.options.loginError;
+    }
+
+    return AUTHENTICATION_RESULT;
+  }
+
+  async refresh(
+    input: RefreshInput,
+  ): Promise<AuthenticationResult> {
+    this.refreshCalls.push(input);
+
+    if (this.options.refreshError) {
+      throw this.options.refreshError;
     }
 
     return AUTHENTICATION_RESULT;
@@ -427,6 +446,222 @@ test("POST /api/auth/login rejects unknown properties", async (t) => {
   assert.equal(response.statusCode, 400);
   assert.equal(
     authenticationService.loginCalls.length,
+    0,
+  );
+});
+test("POST /api/auth/refresh rotates credentials for a valid refresh token", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: {
+      refreshToken: "current-refresh-token",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+
+  assert.deepEqual(
+    response.json(),
+    AUTHENTICATION_RESULT,
+  );
+
+  assert.deepEqual(
+    authenticationService.refreshCalls,
+    [
+      {
+        refreshToken:
+          "current-refresh-token",
+      },
+    ],
+  );
+});
+
+test("POST /api/auth/refresh returns 401 for an invalid refresh token", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService({
+      refreshError:
+        new InvalidRefreshTokenError(),
+    });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: {
+      refreshToken: "invalid-token",
+    },
+  });
+
+  assert.equal(response.statusCode, 401);
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(
+    body.error,
+    "INVALID_REFRESH_TOKEN",
+  );
+
+  assert.equal(
+    body.message,
+    "The refresh token is invalid.",
+  );
+
+  assert.ok(body.requestId);
+});
+
+test("POST /api/auth/refresh returns 401 for an expired session", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService({
+      refreshError:
+        new SessionExpiredError(),
+    });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: {
+      refreshToken: "expired-refresh-token",
+    },
+  });
+
+  assert.equal(response.statusCode, 401);
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(
+    body.error,
+    "SESSION_EXPIRED",
+  );
+
+  assert.equal(
+    body.message,
+    "Session has expired.",
+  );
+
+  assert.ok(body.requestId);
+});
+
+test("POST /api/auth/refresh rejects an invalid request body", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: {
+      refreshToken: "",
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+
+  assert.equal(
+    authenticationService.refreshCalls.length,
+    0,
+  );
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(
+    body.error,
+    "VALIDATION_ERROR",
+  );
+
+  assert.equal(
+    body.message,
+    "Request validation failed.",
+  );
+
+  assert.ok(body.requestId);
+});
+
+test("POST /api/auth/refresh rejects unknown properties", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: {
+      refreshToken:
+        "current-refresh-token",
+      deviceId: "unexpected-device",
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+
+  assert.equal(
+    authenticationService.refreshCalls.length,
     0,
   );
 });

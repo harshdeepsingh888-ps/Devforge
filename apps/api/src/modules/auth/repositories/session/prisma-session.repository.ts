@@ -29,7 +29,8 @@ export class PrismaSessionRepository
           userId: input.userId,
           refreshTokenHash:
             input.refreshTokenHash,
-          expiresAt: new Date(input.expiresAt),
+          expiresAt:
+            new Date(input.expiresAt),
         },
       });
 
@@ -68,16 +69,20 @@ export class PrismaSessionRepository
 
   async rotateRefreshToken(
     sessionId: string,
-    refreshTokenHash: string,
+    currentRefreshTokenHash: string,
+    nextRefreshTokenHash: string,
   ): Promise<AuthSession | null> {
     const result =
       await this.database.session.updateMany({
         where: {
           id: sessionId,
           status: "ACTIVE",
+          refreshTokenHash:
+            currentRefreshTokenHash,
         },
         data: {
-          refreshTokenHash,
+          refreshTokenHash:
+            nextRefreshTokenHash,
           lastUsedAt: new Date(),
         },
       });

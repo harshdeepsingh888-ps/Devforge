@@ -5,10 +5,15 @@ import type {
   AuthenticationConfiguration,
   AuthenticationResult,
   LoginInput,
+  RefreshInput,
   RegisterInput,
 } from "../../authentication.types.js";
 import {
   InvalidCredentialsError,
+  InvalidRefreshTokenError,
+  SessionExpiredError,
+  SessionNotFoundError,
+  SessionRevokedError,
 } from "../../authentication.errors.js";
 import { toPublicAuthUser } from "../../mappers/public-user.mapper.js";
 import type { SessionRepository } from "../../repositories/session/session.repository.js";
@@ -32,7 +37,7 @@ export interface AuthenticationServiceDependencies {
   now?: () => Date;
 }
 
-interface CreatedSessionCredentials {
+interface AuthenticationCredentials {
   sessionId: string;
   refreshToken: RefreshTokenPair;
 }
@@ -112,9 +117,83 @@ export class AuthenticationService {
     );
   }
 
+  async refresh(
+    input: RefreshInput,
+  ): Promise<AuthenticationResult> {
+    const currentRefreshTokenHash =
+      this.dependencies.refreshTokens.hash(
+        input.refreshToken,
+      );
+
+    const session =
+      await this.dependencies.sessions
+        .findByRefreshTokenHash(
+          currentRefreshTokenHash,
+        );
+
+    if (!session) {
+      throw new InvalidRefreshTokenError();
+    }
+
+    if (session.status === "REVOKED") {
+      throw new SessionRevokedError();
+    }
+
+    const sessionHasExpired =
+      session.status === "EXPIRED" ||
+      new Date(session.expiresAt).getTime() <=
+        this.now().getTime();
+
+    if (sessionHasExpired) {
+      if (session.status === "ACTIVE") {
+        await this.dependencies.sessions.revoke(
+          session.id,
+        );
+      }
+
+      throw new SessionExpiredError();
+    }
+
+    if (session.status !== "ACTIVE") {
+      throw new InvalidRefreshTokenError();
+    }
+
+    const user =
+      await this.dependencies.users.findById(
+        session.userId,
+      );
+
+    if (!user) {
+      throw new SessionNotFoundError();
+    }
+
+    const nextRefreshToken =
+      this.dependencies.refreshTokens.generate();
+
+    const rotatedSession =
+      await this.dependencies.sessions
+        .rotateRefreshToken(
+          session.id,
+          currentRefreshTokenHash,
+          nextRefreshToken.hash,
+        );
+
+    if (!rotatedSession) {
+      throw new InvalidRefreshTokenError();
+    }
+
+    return this.issueAuthenticationResult(
+      user,
+      {
+        sessionId: rotatedSession.id,
+        refreshToken: nextRefreshToken,
+      },
+    );
+  }
+
   private async createSession(
     userId: string,
-  ): Promise<CreatedSessionCredentials> {
+  ): Promise<AuthenticationCredentials> {
     const refreshToken =
       this.dependencies.refreshTokens.generate();
 
@@ -142,7 +221,7 @@ export class AuthenticationService {
 
   private async issueAuthenticationResult(
     user: AuthUser,
-    credentials: CreatedSessionCredentials,
+    credentials: AuthenticationCredentials,
   ): Promise<AuthenticationResult> {
     const accessToken =
       await this.dependencies.accessTokens.issue({

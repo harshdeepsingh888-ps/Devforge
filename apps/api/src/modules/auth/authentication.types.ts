@@ -5,6 +5,10 @@ export interface LoginInput {
   password: string;
 }
 
+export interface RefreshInput {
+  refreshToken: string;
+}
+
 export interface RegisterInput {
   email: string;
   password: string;

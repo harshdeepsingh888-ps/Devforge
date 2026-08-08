@@ -18,7 +18,8 @@ export interface SessionRepository {
 
   rotateRefreshToken(
     sessionId: string,
-    refreshTokenHash: string,
+    currentRefreshTokenHash: string,
+    nextRefreshTokenHash: string,
   ): Promise<AuthSession | null>;
 
   touch(

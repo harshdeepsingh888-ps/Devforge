@@ -1,16 +1,23 @@
 import type { FastifyPluginAsync } from "fastify";
 
 import { EmailAlreadyRegisteredError } from "../auth.errors.js";
-import { InvalidCredentialsError } from "../authentication.errors.js";
+import {
+  InvalidCredentialsError,
+  InvalidRefreshTokenError,
+  SessionExpiredError,
+  SessionNotFoundError,
+  SessionRevokedError,
+} from "../authentication.errors.js";
 import type {
   LoginInput,
+  RefreshInput,
   RegisterInput,
 } from "../authentication.types.js";
 import type { AuthenticationService } from "../services/authentication/authentication.service.js";
 
 export type AuthenticationServiceContract = Pick<
   AuthenticationService,
-  "register" | "login"
+  "register" | "login" | "refresh"
 >;
 
 export interface AuthRoutesOptions {
@@ -24,6 +31,10 @@ interface RegisterRoute {
 
 interface LoginRoute {
   Body: LoginInput;
+}
+
+interface RefreshRoute {
+  Body: RefreshInput;
 }
 
 const authenticationResultSchema = {
@@ -178,6 +189,32 @@ const loginSchema = {
   },
 } as const;
 
+const refreshSchema = {
+  tags: ["Authentication"],
+  summary: "Refresh an authenticated session",
+  description:
+    "Rotates a valid refresh token and returns new authentication credentials.",
+  body: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "refreshToken",
+    ],
+    properties: {
+      refreshToken: {
+        type: "string",
+        minLength: 1,
+        maxLength: 512,
+      },
+    },
+  },
+  response: {
+    200: authenticationResultSchema,
+    400: errorResponseSchema,
+    401: errorResponseSchema,
+  },
+} as const;
+
 export const authRoutes: FastifyPluginAsync<
   AuthRoutesOptions
 > = async (app, options) => {
@@ -228,6 +265,42 @@ export const authRoutes: FastifyPluginAsync<
         if (
           error instanceof
           InvalidCredentialsError
+        ) {
+          return reply.code(401).send({
+            error: error.code,
+            message: error.message,
+            requestId: request.id,
+          });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  app.post<RefreshRoute>(
+    "/refresh",
+    {
+      schema: refreshSchema,
+    },
+    async (request, reply) => {
+      try {
+        const result =
+          await options.authenticationService.refresh(
+            request.body,
+          );
+
+        return reply.code(200).send(result);
+      } catch (error) {
+        if (
+          error instanceof
+            InvalidRefreshTokenError ||
+          error instanceof
+            SessionExpiredError ||
+          error instanceof
+            SessionNotFoundError ||
+          error instanceof
+            SessionRevokedError
         ) {
           return reply.code(401).send({
             error: error.code,

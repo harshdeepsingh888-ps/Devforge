@@ -18,6 +18,8 @@ import {
 } from "./modules/projects/project.repository.js";
 import { projectRoutes } from "./modules/projects/project.routes.js";
 import { readinessRoutes } from "./routes/readiness.routes.js";
+import type { AccessTokenService } from "./modules/auth/security/jwt.service.js";
+import { authenticationPlugin } from "./modules/auth/plugins/authentication.plugin.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -51,7 +53,8 @@ export interface BuildAppOptions {
   serverOptions?: FastifyServerOptions;
   projectRepository?: ProjectRepository;
   authenticationService?:
-  AuthenticationServiceContract;
+    AuthenticationServiceContract;
+  accessTokenService?: AccessTokenService;
 }
 
 export function buildApp(
@@ -70,6 +73,16 @@ export function buildApp(
     },
     ...options.serverOptions,
   });
+
+  if (options.accessTokenService) {
+  void app.register(
+    authenticationPlugin,
+    {
+      accessTokens:
+        options.accessTokenService,
+    },
+  );
+}
 
   const projectRepository =
     options.projectRepository ??

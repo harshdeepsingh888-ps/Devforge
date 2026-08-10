@@ -15,6 +15,10 @@ export interface RegisterInput {
   displayName: string;
 }
 
+export interface LogoutInput {
+  sessionId: string;
+  userId: string;
+}
 export interface AuthenticationResult {
   user: PublicAuthUser;
   accessToken: string;

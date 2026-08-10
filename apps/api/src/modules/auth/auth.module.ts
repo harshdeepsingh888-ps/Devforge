@@ -12,36 +12,54 @@ export interface AuthModuleConfiguration {
   refreshTokenExpiresInSeconds: number;
 }
 
-export function createAuthenticationService(
-  configuration: AuthModuleConfiguration,
-): AuthenticationService {
-  const users = new PrismaUserRepository();
-  const sessions = new PrismaSessionRepository();
-  const passwords = new Argon2PasswordService();
+export interface AuthenticationModule {
+  authenticationService: AuthenticationService;
+  accessTokenService: JwtAccessTokenService;
+}
 
-  const registration = new RegistrationService({
-    userRepository: users,
-    passwordService: passwords,
-  });
+export function createAuthenticationModule(
+  configuration: AuthModuleConfiguration,
+): AuthenticationModule {
+  const users =
+    new PrismaUserRepository();
+
+  const sessions =
+    new PrismaSessionRepository();
+
+  const passwords =
+    new Argon2PasswordService();
+
+  const registration =
+    new RegistrationService({
+      userRepository: users,
+      passwordService: passwords,
+    });
 
   const refreshTokens =
     new Sha256RefreshTokenService();
 
-  const accessTokens =
+  const accessTokenService =
     new JwtAccessTokenService(
       configuration.accessToken,
     );
 
-  return new AuthenticationService({
-    users,
-    passwords,
-    registration,
-    sessions,
-    refreshTokens,
-    accessTokens,
-    configuration: {
-      refreshTokenExpiresInSeconds:
-        configuration.refreshTokenExpiresInSeconds,
-    },
-  });
+  const authenticationService =
+    new AuthenticationService({
+      users,
+      passwords,
+      registration,
+      sessions,
+      refreshTokens,
+      accessTokens:
+        accessTokenService,
+      configuration: {
+        refreshTokenExpiresInSeconds:
+          configuration.refreshTokenExpiresInSeconds,
+      },
+    });
+
+  return {
+    authenticationService,
+    accessTokenService,
+  };
 }

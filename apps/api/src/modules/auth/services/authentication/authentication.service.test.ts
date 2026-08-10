@@ -804,3 +804,144 @@ test("refresh rejects reuse of an already rotated refresh token", async () => {
     1,
   );
 });
+test("logout revokes the authenticated session", async () => {
+  const context =
+    await createTestContext();
+
+  const session =
+    createSessionFixture({
+      userId: context.user.id,
+    });
+
+  context.sessions.seed(session);
+
+  await context.service.logout({
+    userId: context.user.id,
+    sessionId: session.id,
+  });
+
+  const revokedSession =
+    await context.sessions.findById(
+      session.id,
+    );
+
+  assert.ok(revokedSession);
+
+  assert.equal(
+    revokedSession.status,
+    "REVOKED",
+  );
+});
+
+test("logout rejects an unknown session", async () => {
+  const context =
+    await createTestContext();
+
+  await assert.rejects(
+    context.service.logout({
+      userId: context.user.id,
+      sessionId: "unknown-session-id",
+    }),
+    SessionNotFoundError,
+  );
+});
+
+test("logout does not allow a user to revoke another user's session", async () => {
+  const context =
+    await createTestContext();
+
+  const session =
+    createSessionFixture({
+      userId: "another-user-id",
+    });
+
+  context.sessions.seed(session);
+
+  await assert.rejects(
+    context.service.logout({
+      userId: context.user.id,
+      sessionId: session.id,
+    }),
+    SessionNotFoundError,
+  );
+
+  const unchangedSession =
+    await context.sessions.findById(
+      session.id,
+    );
+
+  assert.ok(unchangedSession);
+
+  assert.equal(
+    unchangedSession.status,
+    "ACTIVE",
+  );
+});
+
+test("logout rejects an already revoked session", async () => {
+  const context =
+    await createTestContext();
+
+  const session =
+    createSessionFixture({
+      userId: context.user.id,
+      status: "REVOKED",
+    });
+
+  context.sessions.seed(session);
+
+  await assert.rejects(
+    context.service.logout({
+      userId: context.user.id,
+      sessionId: session.id,
+    }),
+    SessionRevokedError,
+  );
+
+  const revokedSession =
+    await context.sessions.findById(
+      session.id,
+    );
+
+  assert.ok(revokedSession);
+
+  assert.equal(
+    revokedSession.status,
+    "REVOKED",
+  );
+});
+
+test("logout rejects an expired session and revokes it", async () => {
+  const context =
+    await createTestContext();
+
+  const session =
+    createSessionFixture({
+      userId: context.user.id,
+      expiresAt: new Date(
+        NOW.getTime() - 1_000,
+      ).toISOString(),
+    });
+
+  context.sessions.seed(session);
+
+  await assert.rejects(
+    context.service.logout({
+      userId: context.user.id,
+      sessionId: session.id,
+    }),
+    SessionExpiredError,
+  );
+
+  const revokedSession =
+    await context.sessions.findById(
+      session.id,
+    );
+
+  assert.ok(revokedSession);
+
+  assert.equal(
+    revokedSession.status,
+    "REVOKED",
+  );
+});

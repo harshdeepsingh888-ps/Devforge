@@ -5,6 +5,7 @@ import type {
   AuthenticationConfiguration,
   AuthenticationResult,
   LoginInput,
+  LogoutInput,
   RefreshInput,
   RegisterInput,
 } from "../../authentication.types.js";
@@ -190,6 +191,50 @@ export class AuthenticationService {
       },
     );
   }
+  async logout(
+  input: LogoutInput,
+): Promise<void> {
+  const session =
+    await this.dependencies.sessions.findById(
+      input.sessionId,
+    );
+
+  if (!session) {
+    throw new SessionNotFoundError();
+  }
+
+  if (session.userId !== input.userId) {
+    throw new SessionNotFoundError();
+  }
+
+  if (session.status === "REVOKED") {
+    throw new SessionRevokedError();
+  }
+
+  const sessionHasExpired =
+    session.status === "EXPIRED" ||
+    new Date(session.expiresAt).getTime() <=
+      this.now().getTime();
+
+  if (sessionHasExpired) {
+    if (session.status === "ACTIVE") {
+      await this.dependencies.sessions.revoke(
+        session.id,
+      );
+    }
+
+    throw new SessionExpiredError();
+  }
+
+  const revokedSession =
+    await this.dependencies.sessions.revoke(
+      session.id,
+    );
+
+  if (!revokedSession) {
+    throw new SessionRevokedError();
+  }
+}
 
   private async createSession(
     userId: string,

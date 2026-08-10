@@ -1,19 +1,22 @@
 ﻿import { buildApp } from "./app.js";
 import {
-  createAuthenticationService,
+  createAuthenticationModule,
 } from "./modules/auth/auth.module.js";
 import {
   env,
   getAuthenticationConfiguration,
 } from "./config/env.js";
 
-const authenticationService =
-  createAuthenticationService(
+const authenticationModule =
+  createAuthenticationModule(
     getAuthenticationConfiguration(),
   );
 
 const app = buildApp({
-  authenticationService,
+  authenticationService:
+    authenticationModule.authenticationService,
+  accessTokenService:
+    authenticationModule.accessTokenService,
 });
 
 async function startServer(): Promise<void> {

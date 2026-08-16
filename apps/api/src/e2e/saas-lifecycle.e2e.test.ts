@@ -224,7 +224,7 @@ test("Full SaaS End-to-End Lifecycle: Register -> Auth -> Create Workspace -> Ma
     headers: { authorization: `Bearer ${user1Token}` },
     payload: {
       userId: user2Id,
-      role: "MEMBER",
+      role: "DEVELOPER",
     },
   });
 

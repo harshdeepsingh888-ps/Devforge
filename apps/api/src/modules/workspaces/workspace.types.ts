@@ -55,3 +55,18 @@ export interface AddWorkspaceMemberInput {
   userId: string;
   role: WorkspaceRole;
 }
+
+export interface Team {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTeamInput {
+  workspaceId: string;
+  name: string;
+  slug: string;
+}

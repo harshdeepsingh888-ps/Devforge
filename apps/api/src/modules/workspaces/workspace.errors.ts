@@ -51,3 +51,21 @@ export class WorkspacePermissionDeniedError extends Error {
     this.name = "WorkspacePermissionDeniedError";
   }
 }
+
+export class TeamNotFoundError extends Error {
+  readonly code = "TEAM_NOT_FOUND";
+
+  constructor() {
+    super("Team not found.");
+    this.name = "TeamNotFoundError";
+  }
+}
+
+export class TeamSlugAlreadyExistsError extends Error {
+  readonly code = "TEAM_SLUG_ALREADY_EXISTS";
+
+  constructor() {
+    super("Team slug is already in use within this workspace.");
+    this.name = "TeamSlugAlreadyExistsError";
+  }
+}

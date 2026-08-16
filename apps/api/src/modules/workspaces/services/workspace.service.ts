@@ -2,6 +2,7 @@ import {
   WorkspaceNotFoundError,
   WorkspaceSlugAlreadyExistsError,
   WorkspaceMembershipAlreadyExistsError,
+  WorkspacePermissionDeniedError,
 } from "../workspace.errors.js";
 import type { WorkspaceRepository } from "../workspace.repository.js";
 import type {
@@ -104,8 +105,18 @@ export class WorkspaceService {
       params.actorUserId,
     );
 
-    if (!actorMembership || actorMembership.role !== "OWNER") {
+    if (!actorMembership) {
       throw new WorkspaceNotFoundError();
+    }
+
+    // Only OWNER and ADMIN can invite/add workspace members
+    if (actorMembership.role !== "OWNER" && actorMembership.role !== "ADMIN") {
+      throw new WorkspaceNotFoundError();
+    }
+
+    // An ADMIN cannot assign the OWNER role (only an OWNER can grant OWNER role)
+    if (actorMembership.role === "ADMIN" && params.role === "OWNER") {
+      throw new WorkspacePermissionDeniedError("Only workspace OWNERs can assign the OWNER role.");
     }
 
     const existingMember = await this.repository.findMembership(

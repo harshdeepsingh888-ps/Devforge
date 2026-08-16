@@ -1,10 +1,29 @@
 export const WORKSPACE_ROLES = [
   "OWNER",
-  "MEMBER",
+  "ADMIN",
+  "DEVELOPER",
+  "VIEWER",
 ] as const;
 
 export type WorkspaceRole =
   (typeof WORKSPACE_ROLES)[number];
+
+export const WORKSPACE_ROLE_HIERARCHY: Record<WorkspaceRole, number> = {
+  OWNER: 4,
+  ADMIN: 3,
+  DEVELOPER: 2,
+  VIEWER: 1,
+};
+
+export function hasMinimumRole(
+  userRole: WorkspaceRole,
+  requiredRole: WorkspaceRole,
+): boolean {
+  return (
+    WORKSPACE_ROLE_HIERARCHY[userRole] >=
+    WORKSPACE_ROLE_HIERARCHY[requiredRole]
+  );
+}
 
 export interface Workspace {
   id: string;

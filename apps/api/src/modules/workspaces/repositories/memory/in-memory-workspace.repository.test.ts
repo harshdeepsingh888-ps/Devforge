@@ -118,7 +118,7 @@ test("finds all workspaces for a user with their membership", async () => {
   await repository.addMember({
     workspaceId: workspaceTwo.id,
     userId: "user-1",
-    role: "MEMBER",
+    role: "DEVELOPER",
   });
 
   await repository.addMember({
@@ -165,7 +165,7 @@ test("finds all workspaces for a user with their membership", async () => {
 
   assert.equal(
     workspaces[1]?.membership.role,
-    "MEMBER",
+    "DEVELOPER",
   );
 });
 
@@ -182,7 +182,7 @@ test("updates a member role", async () => {
   await repository.addMember({
     workspaceId: workspace.id,
     userId: "user-1",
-    role: "MEMBER",
+    role: "DEVELOPER",
   });
 
   const updated =
@@ -225,7 +225,7 @@ test("removes a workspace member", async () => {
   await repository.addMember({
     workspaceId: workspace.id,
     userId: "user-1",
-    role: "MEMBER",
+    role: "DEVELOPER",
   });
 
   assert.equal(

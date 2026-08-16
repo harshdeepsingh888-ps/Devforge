@@ -117,7 +117,7 @@ test("requireWorkspaceMember populates request.workspaceContext for valid member
   assert.equal(body.role, "OWNER");
 });
 
-test("requireWorkspaceRole enforces role requirements (OWNER vs MEMBER)", async (t) => {
+test("requireWorkspaceRole enforces role hierarchy (OWNER > ADMIN > DEVELOPER > VIEWER)", async (t) => {
   const repository = new InMemoryWorkspaceRepository();
   const service = new WorkspaceService(repository);
   const app = Fastify();
@@ -125,44 +125,43 @@ test("requireWorkspaceRole enforces role requirements (OWNER vs MEMBER)", async 
   await app.register(authenticationPlugin, { accessTokens: tokenService });
   await app.register(workspaceTenantPlugin, { workspaceService: service });
   const requireMember = createWorkspaceTenantGuard(service);
-  const requireOwner = requireWorkspaceRole("OWNER");
 
-  const ws = await service.createWorkspace({ name: "DevForge Team", creatorUserId: "owner-1" });
-  await service.addMember({
-    workspaceId: ws.id,
-    actorUserId: "owner-1",
-    targetUserId: "member-1",
-    role: "MEMBER",
-  });
+  const ws = await service.createWorkspace({ name: "Hierarchy Org", creatorUserId: "owner-1" });
 
-  app.delete(
-    "/workspaces/:workspaceId/admin",
-    { preHandler: [requireMember, requireOwner] },
-    async () => ({ adminAction: "completed" }),
+  await service.addMember({ workspaceId: ws.id, actorUserId: "owner-1", targetUserId: "admin-1", role: "ADMIN" });
+  await service.addMember({ workspaceId: ws.id, actorUserId: "owner-1", targetUserId: "dev-1", role: "DEVELOPER" });
+  await service.addMember({ workspaceId: ws.id, actorUserId: "owner-1", targetUserId: "viewer-1", role: "VIEWER" });
+
+  app.post(
+    "/workspaces/:workspaceId/admin-only",
+    { preHandler: [requireMember, requireWorkspaceRole("ADMIN")] },
+    async () => ({ allowed: true }),
+  );
+
+  app.post(
+    "/workspaces/:workspaceId/dev-only",
+    { preHandler: [requireMember, requireWorkspaceRole("DEVELOPER")] },
+    async () => ({ allowed: true }),
   );
 
   t.after(async () => {
     await app.close();
   });
 
-  const memberAuth = await getAuthHeader("member-1");
   const ownerAuth = await getAuthHeader("owner-1");
+  const adminAuth = await getAuthHeader("admin-1");
+  const devAuth = await getAuthHeader("dev-1");
+  const viewerAuth = await getAuthHeader("viewer-1");
 
-  // Call as MEMBER -> 403 Forbidden
-  const memberRes = await app.inject({
-    method: "DELETE",
-    url: `/workspaces/${ws.id}/admin`,
-    headers: memberAuth,
-  });
-  assert.equal(memberRes.statusCode, 403);
-  assert.equal(memberRes.json().error, "FORBIDDEN");
+  // ADMIN route: OWNER (200), ADMIN (200), DEVELOPER (403), VIEWER (403)
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/admin-only`, headers: ownerAuth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/admin-only`, headers: adminAuth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/admin-only`, headers: devAuth })).statusCode, 403);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/admin-only`, headers: viewerAuth })).statusCode, 403);
 
-  // Call as OWNER -> 200 OK
-  const ownerRes = await app.inject({
-    method: "DELETE",
-    url: `/workspaces/${ws.id}/admin`,
-    headers: ownerAuth,
-  });
-  assert.equal(ownerRes.statusCode, 200);
-  assert.equal(ownerRes.json().adminAction, "completed");
+  // DEVELOPER route: OWNER (200), ADMIN (200), DEVELOPER (200), VIEWER (403)
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/dev-only`, headers: ownerAuth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/dev-only`, headers: adminAuth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/dev-only`, headers: devAuth })).statusCode, 200);
+  assert.equal((await app.inject({ method: "POST", url: `/workspaces/${ws.id}/dev-only`, headers: viewerAuth })).statusCode, 403);
 });

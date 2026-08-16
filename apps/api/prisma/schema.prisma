@@ -9,7 +9,9 @@ datasource db {
 
 enum WorkspaceRole {
   OWNER
-  MEMBER
+  ADMIN
+  DEVELOPER
+  VIEWER
 }
 
 enum ProjectStatus {

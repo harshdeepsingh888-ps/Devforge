@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import type { WorkspaceService } from "../services/workspace.service.js";
 import type { WorkspaceWithMembership, WorkspaceRole } from "../workspace.types.js";
+import { hasMinimumRole } from "../workspace.types.js";
 import { WorkspaceNotFoundError } from "../workspace.errors.js";
 
 declare module "fastify" {
@@ -71,7 +72,7 @@ export function createWorkspaceTenantGuard(workspaceService: WorkspaceService) {
   };
 }
 
-export function requireWorkspaceRole(requiredRole: WorkspaceRole) {
+export function requireWorkspaceRole(minimumRequiredRole: WorkspaceRole) {
   return async function checkRole(
     request: FastifyRequest,
     reply: FastifyReply,
@@ -84,10 +85,12 @@ export function requireWorkspaceRole(requiredRole: WorkspaceRole) {
       });
     }
 
-    if (request.workspaceContext.membership.role !== requiredRole) {
+    const userRole = request.workspaceContext.membership.role;
+
+    if (!hasMinimumRole(userRole, minimumRequiredRole)) {
       return reply.code(403).send({
         error: "FORBIDDEN",
-        message: `Action requires ${requiredRole} role in this workspace.`,
+        message: `Action requires at least ${minimumRequiredRole} role in this workspace.`,
         requestId: request.id,
       });
     }

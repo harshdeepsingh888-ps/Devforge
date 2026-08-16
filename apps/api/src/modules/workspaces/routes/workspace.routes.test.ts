@@ -182,11 +182,11 @@ test("POST /api/workspaces/:workspaceId/members adds a member when caller is OWN
     method: "POST",
     url: `/api/workspaces/${ws.id}/members`,
     headers: authHeader,
-    payload: { userId: "new-member-1", role: "MEMBER" },
+    payload: { userId: "new-member-1", role: "DEVELOPER" },
   });
 
   assert.equal(response.statusCode, 201);
   const body = response.json();
   assert.equal(body.data.userId, "new-member-1");
-  assert.equal(body.data.role, "MEMBER");
+  assert.equal(body.data.role, "DEVELOPER");
 });

@@ -42,3 +42,12 @@ export class WorkspaceOwnerRequiredError extends Error {
     this.name = "WorkspaceOwnerRequiredError";
   }
 }
+
+export class WorkspacePermissionDeniedError extends Error {
+  readonly code = "WORKSPACE_PERMISSION_DENIED";
+
+  constructor(message = "Insufficient permissions to perform this action in the workspace.") {
+    super(message);
+    this.name = "WorkspacePermissionDeniedError";
+  }
+}

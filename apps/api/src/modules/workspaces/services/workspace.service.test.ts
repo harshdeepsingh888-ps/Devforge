@@ -6,6 +6,7 @@ import {
   WorkspaceNotFoundError,
   WorkspaceSlugAlreadyExistsError,
   WorkspaceMembershipAlreadyExistsError,
+  WorkspacePermissionDeniedError,
 } from "../workspace.errors.js";
 import { WorkspaceService, slugify } from "./workspace.service.js";
 
@@ -76,7 +77,7 @@ test("lists workspaces belonging to a user", async () => {
     workspaceId: ws2.id,
     actorUserId: "user-2",
     targetUserId: "user-1",
-    role: "MEMBER",
+    role: "DEVELOPER",
   });
 
   const userWorkspaces = await service.listUserWorkspaces("user-1");
@@ -84,7 +85,7 @@ test("lists workspaces belonging to a user", async () => {
   assert.equal(userWorkspaces[0]?.id, ws1.id);
   assert.equal(userWorkspaces[0]?.membership.role, "OWNER");
   assert.equal(userWorkspaces[1]?.id, ws2.id);
-  assert.equal(userWorkspaces[1]?.membership.role, "MEMBER");
+  assert.equal(userWorkspaces[1]?.membership.role, "DEVELOPER");
 });
 
 test("hides workspace details from non-members by throwing WorkspaceNotFoundError", async () => {
@@ -104,7 +105,7 @@ test("hides workspace details from non-members by throwing WorkspaceNotFoundErro
   );
 });
 
-test("only workspace OWNER can add new members", async () => {
+test("OWNER and ADMIN can add members with appropriate role permissions", async () => {
   const repository = new InMemoryWorkspaceRepository();
   const service = new WorkspaceService(repository);
 
@@ -113,22 +114,45 @@ test("only workspace OWNER can add new members", async () => {
     creatorUserId: "owner-id",
   });
 
-  // Owner adds a member
-  await service.addMember({
+  // Owner adds an ADMIN
+  const adminMember = await service.addMember({
     workspaceId: workspace.id,
     actorUserId: "owner-id",
-    targetUserId: "member-id",
-    role: "MEMBER",
+    targetUserId: "admin-id",
+    role: "ADMIN",
   });
+  assert.equal(adminMember.role, "ADMIN");
 
-  // Member attempts to add another member -> throws WorkspaceNotFoundError (authorization barrier)
+  // ADMIN adds a DEVELOPER
+  const devMember = await service.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "admin-id",
+    targetUserId: "dev-id",
+    role: "DEVELOPER",
+  });
+  assert.equal(devMember.role, "DEVELOPER");
+
+  // ADMIN attempts to appoint an OWNER -> throws WorkspacePermissionDeniedError
   await assert.rejects(
     async () => {
       await service.addMember({
         workspaceId: workspace.id,
-        actorUserId: "member-id",
+        actorUserId: "admin-id",
         targetUserId: "other-id",
-        role: "MEMBER",
+        role: "OWNER",
+      });
+    },
+    WorkspacePermissionDeniedError,
+  );
+
+  // DEVELOPER attempts to add a member -> throws WorkspaceNotFoundError
+  await assert.rejects(
+    async () => {
+      await service.addMember({
+        workspaceId: workspace.id,
+        actorUserId: "dev-id",
+        targetUserId: "new-user-id",
+        role: "VIEWER",
       });
     },
     WorkspaceNotFoundError,
@@ -148,7 +172,7 @@ test("prevents adding duplicate members to the same workspace", async () => {
     workspaceId: workspace.id,
     actorUserId: "owner-id",
     targetUserId: "member-id",
-    role: "MEMBER",
+    role: "DEVELOPER",
   });
 
   await assert.rejects(
@@ -157,7 +181,7 @@ test("prevents adding duplicate members to the same workspace", async () => {
         workspaceId: workspace.id,
         actorUserId: "owner-id",
         targetUserId: "member-id",
-        role: "MEMBER",
+        role: "DEVELOPER",
       });
     },
     WorkspaceMembershipAlreadyExistsError,

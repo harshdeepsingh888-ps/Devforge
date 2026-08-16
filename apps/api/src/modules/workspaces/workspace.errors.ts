@@ -87,3 +87,57 @@ export class TeamMemberNotFoundError extends Error {
     this.name = "TeamMemberNotFoundError";
   }
 }
+
+export class InvitationNotFoundError extends Error {
+  readonly code = "INVITATION_NOT_FOUND";
+
+  constructor() {
+    super("Invitation not found.");
+    this.name = "InvitationNotFoundError";
+  }
+}
+
+export class InvitationExpiredError extends Error {
+  readonly code = "INVITATION_EXPIRED";
+
+  constructor() {
+    super("Invitation has expired.");
+    this.name = "InvitationExpiredError";
+  }
+}
+
+export class InvitationRevokedError extends Error {
+  readonly code = "INVITATION_REVOKED";
+
+  constructor() {
+    super("Invitation has been revoked.");
+    this.name = "InvitationRevokedError";
+  }
+}
+
+export class InvitationAlreadyAcceptedError extends Error {
+  readonly code = "INVITATION_ALREADY_ACCEPTED";
+
+  constructor() {
+    super("Invitation has already been accepted.");
+    this.name = "InvitationAlreadyAcceptedError";
+  }
+}
+
+export class InvitationAlreadyPendingError extends Error {
+  readonly code = "INVITATION_ALREADY_PENDING";
+
+  constructor() {
+    super("A pending invitation already exists for this email in the workspace.");
+    this.name = "InvitationAlreadyPendingError";
+  }
+}
+
+export class InvitationCannotBeRevokedError extends Error {
+  readonly code = "INVITATION_CANNOT_BE_REVOKED";
+
+  constructor() {
+    super("Only pending invitations can be revoked.");
+    this.name = "InvitationCannotBeRevokedError";
+  }
+}

@@ -25,6 +25,15 @@ export function hasMinimumRole(
   );
 }
 
+export const INVITATION_STATUSES = [
+  "PENDING",
+  "ACCEPTED",
+  "EXPIRED",
+  "REVOKED",
+] as const;
+
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+
 export interface Workspace {
   id: string;
   name: string;
@@ -80,4 +89,26 @@ export interface TeamMember {
 export interface AddTeamMemberInput {
   teamId: string;
   userId: string;
+}
+
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  tokenHash: string;
+  status: InvitationStatus;
+  expiresAt: string;
+  invitedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateInvitationInput {
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  tokenHash: string;
+  expiresAt: string;
+  invitedByUserId: string;
 }

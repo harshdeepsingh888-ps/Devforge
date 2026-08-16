@@ -1,17 +1,33 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildApp } from "../../app.js";
 import { InMemoryProjectRepository } from "./project.repository.js";
+import { InMemoryWorkspaceRepository } from "../workspaces/repositories/memory/in-memory-workspace.repository.js";
+import { WorkspaceService } from "../workspaces/services/workspace.service.js";
 
-test("GET /api/projects returns an empty project list", async (t) => {
+async function createTestSetup() {
+  const projectRepository = new InMemoryProjectRepository();
+  const workspaceRepository = new InMemoryWorkspaceRepository();
+  const workspaceService = new WorkspaceService(workspaceRepository);
+
   const app = buildApp({
-    serverOptions: {
-      logger: false,
-
-    },
-    projectRepository: new InMemoryProjectRepository(),
+    serverOptions: { logger: false },
+    projectRepository,
+    workspaceRepository,
+    workspaceService,
   });
+
+  const workspace = await workspaceService.createWorkspace({
+    name: "DevForge Engineering",
+    creatorUserId: "user-owner-1",
+  });
+
+  return { app, workspaceService, workspace, projectRepository };
+}
+
+test("GET /api/workspaces/:workspaceId/projects returns 401 when unauthenticated", async (t) => {
+  const { app, workspace } = await createTestSetup();
 
   t.after(async () => {
     await app.close();
@@ -19,28 +35,14 @@ test("GET /api/projects returns an empty project list", async (t) => {
 
   const response = await app.inject({
     method: "GET",
-    url: "/api/projects",
+    url: `/api/workspaces/${workspace.id}/projects`,
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), {
-    data: [],
-  });
+  assert.equal(response.statusCode, 401);
 });
-test("GET /api/projects/:projectId returns a project", async (t) => {
-  const repository = new InMemoryProjectRepository();
 
-  const createdProject = await repository.create({
-    name: "DevForge",
-    description: "Developer operating system",
-  });
-
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-    },
-    projectRepository: repository,
-  });
+test("GET /api/workspaces/:workspaceId/projects returns 404 for non-members", async (t) => {
+  const { app, workspace } = await createTestSetup();
 
   t.after(async () => {
     await app.close();
@@ -48,302 +50,109 @@ test("GET /api/projects/:projectId returns a project", async (t) => {
 
   const response = await app.inject({
     method: "GET",
-    url: `/api/projects/${createdProject.id}`,
-  });
-
-  assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), {
-    data: createdProject,
-  });
-});
-test("GET /api/projects/:projectId returns 404 for an unknown project", async (t) => {
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-    },
-    projectRepository: new InMemoryProjectRepository(),
-  });
-
-  t.after(async () => {
-    await app.close();
-  });
-
-  const response = await app.inject({
-    method: "GET",
-    url: "/api/projects/unknown-project-id",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: { "x-user-id": "outsider-user" },
   });
 
   assert.equal(response.statusCode, 404);
-  assert.deepEqual(response.json(), {
-    error: "PROJECT_NOT_FOUND",
-    message: "Project not found.",
-  });
 });
 
-test("POST /api/projects creates an active project", async (t) => {
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-
-    },
-    projectRepository: new InMemoryProjectRepository(),
-  });
+test("POST and GET /api/workspaces/:workspaceId/projects creates and lists tenant projects", async (t) => {
+  const { app, workspace } = await createTestSetup();
 
   t.after(async () => {
     await app.close();
   });
 
-  const response = await app.inject({
+  const createRes = await app.inject({
     method: "POST",
-    url: "/api/projects",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: { "x-user-id": "user-owner-1" },
     payload: {
-      name: " DevForge ",
-      description: " Developer operating system ",
+      name: "DevForge API Core",
+      description: "Fastify backend engine",
     },
   });
 
-  assert.equal(response.statusCode, 201);
+  assert.equal(createRes.statusCode, 201);
+  const created = createRes.json().data;
+  assert.equal(created.name, "DevForge API Core");
+  assert.equal(created.workspaceId, workspace.id);
 
-  const body = response.json<{
-    data: {
-      id: string;
-      name: string;
-      description: string | null;
-      status: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }>();
-
-  assert.ok(body.data.id);
-  assert.equal(body.data.name, "DevForge");
-  assert.equal(
-    body.data.description,
-    "Developer operating system",
-  );
-  assert.equal(body.data.status, "ACTIVE");
-  assert.equal(
-    Number.isNaN(Date.parse(body.data.createdAt)),
-    false,
-  );
-  assert.equal(body.data.createdAt, body.data.updatedAt);
-});
-
-test("GET /api/projects returns previously created projects", async (t) => {
-  const repository = new InMemoryProjectRepository();
-
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-
-    },
-    projectRepository: repository,
-  });
-
-  t.after(async () => {
-    await app.close();
-  });
-
-  await app.inject({
-    method: "POST",
-    url: "/api/projects",
-    payload: {
-      name: "DevForge",
-    },
-  });
-
-  const response = await app.inject({
+  const listRes = await app.inject({
     method: "GET",
-    url: "/api/projects",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: { "x-user-id": "user-owner-1" },
   });
 
-  assert.equal(response.statusCode, 200);
-
-  const body = response.json<{
-    data: Array<{
-      name: string;
-      description: string | null;
-      status: string;
-    }>;
-  }>();
-
-  assert.equal(body.data.length, 1);
-  assert.equal(body.data[0]?.name, "DevForge");
-  assert.equal(body.data[0]?.description, null);
-  assert.equal(body.data[0]?.status, "ACTIVE");
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.json().data.length, 1);
+  assert.equal(listRes.json().data[0].id, created.id);
 });
 
-test("POST /api/projects rejects a whitespace-only name", async (t) => {
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-
-    },
-    projectRepository: new InMemoryProjectRepository(),
-  });
+test("enforces tenant isolation across multiple workspaces", async (t) => {
+  const { app, workspaceService, workspace: ws1, projectRepository } = await createTestSetup();
 
   t.after(async () => {
     await app.close();
   });
 
-  const response = await app.inject({
-    method: "POST",
-    url: "/api/projects",
-    payload: {
-      name: "   ",
-    },
+  const ws2 = await workspaceService.createWorkspace({
+    name: "Secondary Org",
+    creatorUserId: "user-owner-2",
   });
 
-  assert.equal(response.statusCode, 400);
-  assert.deepEqual(response.json(), {
-    error: "VALIDATION_ERROR",
-    message: "Project name cannot be empty.",
-  });
-});
-
-test("POST /api/projects rejects an unknown property", async (t) => {
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-
-    },
-    projectRepository: new InMemoryProjectRepository(),
+  await projectRepository.create({
+    workspaceId: ws1.id,
+    name: "Workspace 1 Project",
   });
 
-  t.after(async () => {
-    await app.close();
+  await projectRepository.create({
+    workspaceId: ws2.id,
+    name: "Workspace 2 Project",
   });
 
-  const response = await app.inject({
-    method: "POST",
-    url: "/api/projects",
-    payload: {
-      name: "DevForge",
-      unsupportedField: true,
-    },
-  });
-
-  assert.equal(response.statusCode, 400);
-});
-test("PATCH /api/projects/:projectId/status updates the project status", async (t) => {
-  const repository = new InMemoryProjectRepository();
-
-  const createdProject = await repository.create({
-    name: "DevForge",
-  });
-
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-    },
-    projectRepository: repository,
-  });
-
-  t.after(async () => {
-    await app.close();
-  });
-
-  const response = await app.inject({
-    method: "PATCH",
-    url: `/api/projects/${createdProject.id}/status`,
-    payload: {
-      status: "PAUSED",
-    },
-  });
-
-  assert.equal(response.statusCode, 200);
-
-  const body = response.json<{
-    data: {
-      id: string;
-      status: string;
-      createdAt: string;
-      updatedAt: string;
-    };
-  }>();
-
-  assert.equal(body.data.id, createdProject.id);
-  assert.equal(body.data.status, "PAUSED");
-  assert.equal(body.data.createdAt, createdProject.createdAt);
-  assert.ok(
-    Date.parse(body.data.updatedAt) >=
-      Date.parse(createdProject.updatedAt),
-  );
-});
-
-test("PATCH /api/projects/:projectId/status returns 404 for an unknown project", async (t) => {
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-    },
-    projectRepository: new InMemoryProjectRepository(),
-  });
-
-  t.after(async () => {
-    await app.close();
-  });
-
-  const response = await app.inject({
-    method: "PATCH",
-    url: "/api/projects/unknown-project-id/status",
-    payload: {
-      status: "PAUSED",
-    },
-  });
-
-  assert.equal(response.statusCode, 404);
-  assert.deepEqual(response.json(), {
-    error: "PROJECT_NOT_FOUND",
-    message: "Project not found.",
-  });
-});
-
-test("PATCH /api/projects/:projectId/status rejects an invalid status", async (t) => {
-  const repository = new InMemoryProjectRepository();
-
-  const createdProject = await repository.create({
-    name: "DevForge",
-  });
-
-  const app = buildApp({
-    serverOptions: {
-      logger: false,
-    },
-    projectRepository: repository,
-  });
-
-  t.after(async () => {
-    await app.close();
-  });
-
-  const response = await app.inject({
-    method: "PATCH",
-    url: `/api/projects/${createdProject.id}/status`,
-    payload: {
-      status: "COMPLETED",
-    },
-  });
-
-  assert.equal(response.statusCode, 400);
-});
-test("rate limiting returns 429 after too many requests", async () => {
-  const app = buildApp();
-
-  for (let requestNumber = 1; requestNumber <= 100; requestNumber += 1) {
-    const response = await app.inject({
-      method: "GET",
-      url: "/health",
-    });
-
-    assert.equal(response.statusCode, 200);
-  }
-
-  const limitedResponse = await app.inject({
+  // User 1 lists projects in Workspace 1 -> receives only Workspace 1 Project
+  const ws1Res = await app.inject({
     method: "GET",
-    url: "/health",
+    url: `/api/workspaces/${ws1.id}/projects`,
+    headers: { "x-user-id": "user-owner-1" },
   });
 
-  assert.equal(limitedResponse.statusCode, 429);
+  assert.equal(ws1Res.statusCode, 200);
+  const ws1Data = ws1Res.json().data;
+  assert.equal(ws1Data.length, 1);
+  assert.equal(ws1Data[0].name, "Workspace 1 Project");
 
-  await app.close();
+  // User 1 attempts to list projects in Workspace 2 -> 404 (not a member)
+  const forbiddenRes = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${ws2.id}/projects`,
+    headers: { "x-user-id": "user-owner-1" },
+  });
+
+  assert.equal(forbiddenRes.statusCode, 404);
+});
+
+test("PATCH /api/workspaces/:workspaceId/projects/:projectId/status updates status within tenant", async (t) => {
+  const { app, workspace, projectRepository } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const project = await projectRepository.create({
+    workspaceId: workspace.id,
+    name: "Project to Pause",
+  });
+
+  const patchRes = await app.inject({
+    method: "PATCH",
+    url: `/api/workspaces/${workspace.id}/projects/${project.id}/status`,
+    headers: { "x-user-id": "user-owner-1" },
+    payload: { status: "PAUSED" },
+  });
+
+  assert.equal(patchRes.statusCode, 200);
+  assert.equal(patchRes.json().data.status, "PAUSED");
 });

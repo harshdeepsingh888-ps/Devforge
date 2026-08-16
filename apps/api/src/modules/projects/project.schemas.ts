@@ -5,6 +5,10 @@ const projectProperties = {
     type: "string",
     description: "Unique project identifier.",
   },
+  workspaceId: {
+    type: "string",
+    description: "Identifier of the owning workspace tenant.",
+  },
   name: {
     type: "string",
     description: "Human-readable project name.",
@@ -42,6 +46,7 @@ const projectSchema = {
   additionalProperties: false,
   required: [
     "id",
+    "workspaceId",
     "name",
     "description",
     "status",
@@ -80,7 +85,17 @@ export const listProjectsSchema = {
   tags: ["Projects"],
   summary: "List projects",
   description:
-    "Returns all projects currently stored in the DevForge workspace.",
+    "Returns all projects belonging to the specified workspace tenant.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId"],
+    properties: {
+      workspaceId: {
+        type: "string",
+      },
+    },
+  },
   response: {
     200: {
       type: "object",
@@ -100,12 +115,15 @@ export const getProjectSchema = {
   tags: ["Projects"],
   summary: "Get a project",
   description:
-    "Returns one DevForge project identified by its project ID.",
+    "Returns one project identified by its project ID within a workspace tenant.",
   params: {
     type: "object",
     additionalProperties: false,
-    required: ["projectId"],
+    required: ["workspaceId", "projectId"],
     properties: {
+      workspaceId: {
+        type: "string",
+      },
       projectId: {
         type: "string",
       },
@@ -121,7 +139,17 @@ export const createProjectSchema = {
   tags: ["Projects"],
   summary: "Create a project",
   description:
-    "Creates a new DevForge project with an initial ACTIVE status.",
+    "Creates a new project in the specified workspace tenant with an initial ACTIVE status.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId"],
+    properties: {
+      workspaceId: {
+        type: "string",
+      },
+    },
+  },
   body: {
     type: "object",
     additionalProperties: false,
@@ -131,13 +159,13 @@ export const createProjectSchema = {
         type: "string",
         minLength: 1,
         maxLength: 100,
-        examples: ["DevForge"],
+        examples: ["DevForge Core"],
       },
       description: {
         type: "string",
         maxLength: 500,
         examples: [
-          "A developer operating system for preserving engineering context.",
+          "Developer operating system backend.",
         ],
       },
     },
@@ -151,12 +179,15 @@ export const updateProjectStatusSchema = {
   tags: ["Projects"],
   summary: "Update project status",
   description:
-    "Changes the lifecycle status of an existing DevForge project.",
+    "Changes the lifecycle status of an existing project in a workspace tenant.",
   params: {
     type: "object",
     additionalProperties: false,
-    required: ["projectId"],
+    required: ["workspaceId", "projectId"],
     properties: {
+      workspaceId: {
+        type: "string",
+      },
       projectId: {
         type: "string",
       },

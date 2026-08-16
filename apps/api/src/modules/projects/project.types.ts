@@ -1,4 +1,4 @@
-﻿export const PROJECT_STATUSES = [
+export const PROJECT_STATUSES = [
   "ACTIVE",
   "PAUSED",
   "ARCHIVED",
@@ -9,6 +9,7 @@ export type ProjectStatus =
 
 export interface Project {
   id: string;
+  workspaceId: string;
   name: string;
   description: string | null;
   status: ProjectStatus;
@@ -17,6 +18,7 @@ export interface Project {
 }
 
 export interface CreateProjectInput {
+  workspaceId: string;
   name: string;
   description?: string;
 }

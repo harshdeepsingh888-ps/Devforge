@@ -277,9 +277,9 @@ export function buildApp(
       await application.register(
         projectRoutes,
         {
-          prefix: "/api/projects",
-          repository:
-            projectRepository,
+          prefix: "/api/workspaces/:workspaceId/projects",
+          repository: projectRepository,
+          workspaceService,
         },
       );
     },

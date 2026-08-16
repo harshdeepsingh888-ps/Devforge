@@ -1,4 +1,4 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
@@ -6,6 +6,8 @@ import {
   buildApp,
 } from "./app.js";
 import { InMemoryProjectRepository } from "./modules/projects/project.repository.js";
+import { InMemoryWorkspaceRepository } from "./modules/workspaces/repositories/memory/in-memory-workspace.repository.js";
+import { WorkspaceService } from "./modules/workspaces/services/workspace.service.js";
 
 test("GET /health returns the API health status", async (t) => {
   const app = buildApp({
@@ -24,22 +26,57 @@ test("GET /health returns the API health status", async (t) => {
   });
 
   assert.equal(response.statusCode, 200);
-
-  const body = response.json<{
-    status: string;
-    service: string;
-    timestamp: string;
-  }>();
-
-  assert.equal(body.status, "ok");
-  assert.equal(body.service, "devforge-api");
   assert.equal(
-    Number.isNaN(Date.parse(body.timestamp)),
-    false,
+    typeof response.json<{ timestamp: string }>().timestamp,
+    "string",
   );
+  assert.deepEqual(response.json(), {
+    status: "ok",
+    service: "devforge-api",
+    timestamp: response.json<{ timestamp: string }>().timestamp,
+  });
 });
 
-test("validation errors return a safe standardized response", async (t) => {
+test("rejects request bodies exceeding the maximum payload limit", async (t) => {
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const largeBody = "x".repeat(API_BODY_LIMIT_BYTES + 1);
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/workspaces",
+    headers: {
+      "content-type": "application/json",
+      "x-user-id": "user-1",
+    },
+    payload: `{"name":"${largeBody}"}`,
+  });
+
+  assert.equal(response.statusCode, 413);
+
+  const body = response.json<{
+    error: string;
+    message: string;
+    requestId: string;
+  }>();
+
+  assert.equal(body.error, "PAYLOAD_TOO_LARGE");
+  assert.equal(
+    body.message,
+    "Request payload exceeds the allowed size.",
+  );
+  assert.ok(body.requestId);
+});
+
+test("formats schema validation errors into a predictable response structure", async (t) => {
   const app = buildApp({
     serverOptions: {
       logger: false,
@@ -52,11 +89,12 @@ test("validation errors return a safe standardized response", async (t) => {
 
   const response = await app.inject({
     method: "POST",
-    url: "/api/projects",
-    payload: {
-      name: "DevForge",
-      unexpectedField: true,
+    url: "/api/workspaces",
+    headers: {
+      "content-type": "application/json",
+      "x-user-id": "user-1",
     },
+    payload: {},
   });
 
   assert.equal(response.statusCode, 400);
@@ -77,27 +115,38 @@ test("validation errors return a safe standardized response", async (t) => {
 
 test("unexpected repository errors return a safe 500 response", async (t) => {
   class FailingProjectRepository extends InMemoryProjectRepository {
-    override async findAll(): Promise<never> {
+    override async findAllByWorkspaceId(): Promise<never> {
       throw new Error(
         "Database connection failed: secret-value",
       );
     }
   }
 
+  const workspaceRepository = new InMemoryWorkspaceRepository();
+  const workspaceService = new WorkspaceService(workspaceRepository);
+
   const app = buildApp({
     serverOptions: {
       logger: false,
     },
     projectRepository: new FailingProjectRepository(),
+    workspaceRepository,
+    workspaceService,
   });
 
   t.after(async () => {
     await app.close();
   });
 
+  const workspace = await workspaceService.createWorkspace({
+    name: "DevForge",
+    creatorUserId: "user-1",
+  });
+
   const response = await app.inject({
     method: "GET",
-    url: "/api/projects",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: { "x-user-id": "user-1" },
   });
 
   assert.equal(response.statusCode, 500);

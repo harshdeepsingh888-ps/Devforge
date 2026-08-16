@@ -1,4 +1,4 @@
-﻿import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 
 import type { ProjectRepository } from "./project.repository.js";
 import {
@@ -8,9 +8,12 @@ import {
   updateProjectStatusSchema,
 } from "./project.schemas.js";
 import type { ProjectStatus } from "./project.types.js";
+import type { WorkspaceService } from "../workspaces/services/workspace.service.js";
+import { createWorkspaceTenantGuard } from "../workspaces/plugins/workspace-tenant.plugin.js";
 
 interface ProjectRoutesOptions {
   repository: ProjectRepository;
+  workspaceService: WorkspaceService;
 }
 
 interface CreateProjectBody {
@@ -18,7 +21,11 @@ interface CreateProjectBody {
   description?: string;
 }
 
-interface ProjectParams {
+interface WorkspaceParams {
+  workspaceId: string;
+}
+
+interface WorkspaceProjectParams extends WorkspaceParams {
   projectId: string;
 }
 
@@ -29,13 +36,21 @@ interface UpdateProjectStatusBody {
 export const projectRoutes: FastifyPluginAsync<
   ProjectRoutesOptions
 > = async (app, options) => {
-  app.get(
+  const requireWorkspaceMember = createWorkspaceTenantGuard(options.workspaceService);
+
+  app.addHook("preHandler", requireWorkspaceMember);
+
+  app.get<{
+    Params: WorkspaceParams;
+  }>(
     "/",
     {
       schema: listProjectsSchema,
     },
-    async () => {
-      const projects = await options.repository.findAll();
+    async (request) => {
+      const projects = await options.repository.findAllByWorkspaceId(
+        request.params.workspaceId,
+      );
 
       return {
         data: projects,
@@ -44,7 +59,7 @@ export const projectRoutes: FastifyPluginAsync<
   );
 
   app.get<{
-    Params: ProjectParams;
+    Params: WorkspaceProjectParams;
   }>(
     "/:projectId",
     {
@@ -52,6 +67,7 @@ export const projectRoutes: FastifyPluginAsync<
     },
     async (request, reply) => {
       const project = await options.repository.findById(
+        request.params.workspaceId,
         request.params.projectId,
       );
 
@@ -69,6 +85,7 @@ export const projectRoutes: FastifyPluginAsync<
   );
 
   app.post<{
+    Params: WorkspaceParams;
     Body: CreateProjectBody;
   }>(
     "/",
@@ -77,8 +94,7 @@ export const projectRoutes: FastifyPluginAsync<
     },
     async (request, reply) => {
       const name = request.body.name.trim();
-      const description =
-        request.body.description?.trim();
+      const description = request.body.description?.trim();
 
       if (name.length === 0) {
         return reply.code(400).send({
@@ -88,6 +104,7 @@ export const projectRoutes: FastifyPluginAsync<
       }
 
       const project = await options.repository.create({
+        workspaceId: request.params.workspaceId,
         name,
         ...(description !== undefined && {
           description,
@@ -101,7 +118,7 @@ export const projectRoutes: FastifyPluginAsync<
   );
 
   app.patch<{
-    Params: ProjectParams;
+    Params: WorkspaceProjectParams;
     Body: UpdateProjectStatusBody;
   }>(
     "/:projectId/status",
@@ -109,11 +126,11 @@ export const projectRoutes: FastifyPluginAsync<
       schema: updateProjectStatusSchema,
     },
     async (request, reply) => {
-      const project =
-        await options.repository.updateStatus(
-          request.params.projectId,
-          request.body.status,
-        );
+      const project = await options.repository.updateStatus(
+        request.params.workspaceId,
+        request.params.projectId,
+        request.body.status,
+      );
 
       if (!project) {
         return reply.code(404).send({

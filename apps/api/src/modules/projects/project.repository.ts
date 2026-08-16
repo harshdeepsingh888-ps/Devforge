@@ -1,4 +1,4 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import type {
   CreateProjectInput,
@@ -8,9 +8,13 @@ import type {
 
 export interface ProjectRepository {
   create(input: CreateProjectInput): Promise<Project>;
-  findAll(): Promise<Project[]>;
-  findById(projectId: string): Promise<Project | null>;
+  findAllByWorkspaceId(workspaceId: string): Promise<Project[]>;
+  findById(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<Project | null>;
   updateStatus(
+    workspaceId: string,
     projectId: string,
     status: ProjectStatus,
   ): Promise<Project | null>;
@@ -28,6 +32,7 @@ export class InMemoryProjectRepository
 
     const project: Project = {
       id: randomUUID(),
+      workspaceId: input.workspaceId,
       name: input.name,
       description: input.description ?? null,
       status: "ACTIVE",
@@ -40,21 +45,33 @@ export class InMemoryProjectRepository
     return project;
   }
 
-  async findAll(): Promise<Project[]> {
-    return Array.from(this.projects.values());
+  async findAllByWorkspaceId(workspaceId: string): Promise<Project[]> {
+    const results: Project[] = [];
+    for (const project of this.projects.values()) {
+      if (project.workspaceId === workspaceId) {
+        results.push(project);
+      }
+    }
+    return results;
   }
 
   async findById(
+    workspaceId: string,
     projectId: string,
   ): Promise<Project | null> {
-    return this.projects.get(projectId) ?? null;
+    const project = this.projects.get(projectId);
+    if (!project || project.workspaceId !== workspaceId) {
+      return null;
+    }
+    return project;
   }
 
   async updateStatus(
+    workspaceId: string,
     projectId: string,
     status: ProjectStatus,
   ): Promise<Project | null> {
-    const project = this.projects.get(projectId);
+    const project = await this.findById(workspaceId, projectId);
 
     if (!project) {
       return null;

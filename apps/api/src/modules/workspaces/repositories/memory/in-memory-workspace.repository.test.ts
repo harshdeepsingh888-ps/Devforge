@@ -93,44 +93,79 @@ test("adds and retrieves workspace membership", async () => {
   );
 });
 
-test("lists workspace memberships", async () => {
+test("finds all workspaces for a user with their membership", async () => {
   const repository =
     new InMemoryWorkspaceRepository();
 
-  const workspace =
+  const workspaceOne =
     await repository.create({
       name: "DevForge",
       slug: "devforge",
     });
 
+  const workspaceTwo =
+    await repository.create({
+      name: "SideProject",
+      slug: "side-project",
+    });
+
   await repository.addMember({
-    workspaceId: workspace.id,
+    workspaceId: workspaceOne.id,
     userId: "user-1",
     role: "OWNER",
   });
 
   await repository.addMember({
-    workspaceId: workspace.id,
-    userId: "user-2",
+    workspaceId: workspaceTwo.id,
+    userId: "user-1",
     role: "MEMBER",
   });
 
-  const memberships =
-    await repository.listMemberships(
-      workspace.id,
+  await repository.addMember({
+    workspaceId: workspaceTwo.id,
+    userId: "user-2",
+    role: "OWNER",
+  });
+
+  const workspaces =
+    await repository.findForUser(
+      "user-1",
     );
 
   assert.equal(
-    memberships.length,
+    workspaces.length,
     2,
   );
 
   assert.deepEqual(
-    memberships.map(
-      (membership) =>
-        membership.userId,
+    workspaces.map(
+      (workspace) =>
+        workspace.id,
     ),
-    ["user-1", "user-2"],
+    [
+      workspaceOne.id,
+      workspaceTwo.id,
+    ],
+  );
+
+  assert.equal(
+    workspaces[0]?.membership.userId,
+    "user-1",
+  );
+
+  assert.equal(
+    workspaces[0]?.membership.role,
+    "OWNER",
+  );
+
+  assert.equal(
+    workspaces[1]?.membership.userId,
+    "user-1",
+  );
+
+  assert.equal(
+    workspaces[1]?.membership.role,
+    "MEMBER",
   );
 });
 

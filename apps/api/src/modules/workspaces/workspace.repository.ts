@@ -4,6 +4,7 @@ import type {
   Workspace,
   WorkspaceMember,
   WorkspaceRole,
+  WorkspaceWithMembership,
 } from "./workspace.types.js";
 
 export interface WorkspaceRepository {
@@ -19,27 +20,27 @@ export interface WorkspaceRepository {
     slug: string,
   ): Promise<Workspace | null>;
 
-  findMembership(
-    workspaceId: string,
+  findForUser(
     userId: string,
-  ): Promise<WorkspaceMember | null>;
-
-  listMemberships(
-    workspaceId: string,
-  ): Promise<WorkspaceMember[]>;
+  ): Promise<WorkspaceWithMembership[]>;
 
   addMember(
     input: AddWorkspaceMemberInput,
   ): Promise<WorkspaceMember>;
 
-  updateMemberRole(
+  findMembership(
     workspaceId: string,
     userId: string,
-    role: WorkspaceRole,
   ): Promise<WorkspaceMember | null>;
 
   removeMember(
     workspaceId: string,
     userId: string,
   ): Promise<boolean>;
+
+  updateMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: WorkspaceRole,
+  ): Promise<WorkspaceMember | null>;
 }

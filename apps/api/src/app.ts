@@ -1,4 +1,4 @@
-﻿import helmet from "@fastify/helmet";
+import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -20,6 +20,10 @@ import { projectRoutes } from "./modules/projects/project.routes.js";
 import { readinessRoutes } from "./routes/readiness.routes.js";
 import type { AccessTokenService } from "./modules/auth/security/jwt.service.js";
 import { authenticationPlugin } from "./modules/auth/plugins/authentication.plugin.js";
+import { InMemoryWorkspaceRepository } from "./modules/workspaces/repositories/memory/in-memory-workspace.repository.js";
+import type { WorkspaceRepository } from "./modules/workspaces/workspace.repository.js";
+import { WorkspaceService } from "./modules/workspaces/services/workspace.service.js";
+import { workspaceRoutes } from "./modules/workspaces/routes/workspace.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -52,6 +56,8 @@ function isHttpError(
 export interface BuildAppOptions {
   serverOptions?: FastifyServerOptions;
   projectRepository?: ProjectRepository;
+  workspaceRepository?: WorkspaceRepository;
+  workspaceService?: WorkspaceService;
   authenticationService?:
     AuthenticationServiceContract;
   accessTokenService?: AccessTokenService;
@@ -75,18 +81,26 @@ export function buildApp(
   });
 
   if (options.accessTokenService) {
-  void app.register(
-    authenticationPlugin,
-    {
-      accessTokens:
-        options.accessTokenService,
-    },
-  );
-}
+    void app.register(
+      authenticationPlugin,
+      {
+        accessTokens:
+          options.accessTokenService,
+      },
+    );
+  }
 
   const projectRepository =
     options.projectRepository ??
     new InMemoryProjectRepository();
+
+  const workspaceRepository =
+    options.workspaceRepository ??
+    new InMemoryWorkspaceRepository();
+
+  const workspaceService =
+    options.workspaceService ??
+    new WorkspaceService(workspaceRepository);
 
   void app.register(swagger, {
     openapi: {
@@ -107,6 +121,11 @@ export function buildApp(
           name: "Authentication",
           description:
             "User registration and authentication endpoints.",
+        },
+        {
+          name: "Workspaces",
+          description:
+            "DevForge organization & multi-tenant workspace management endpoints.",
         },
         {
           name: "Projects",
@@ -246,6 +265,14 @@ export function buildApp(
           },
         );
       }
+
+      await application.register(
+        workspaceRoutes,
+        {
+          prefix: "/api/workspaces",
+          service: workspaceService,
+        },
+      );
 
       await application.register(
         projectRoutes,

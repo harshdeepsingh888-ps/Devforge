@@ -21,7 +21,7 @@ export function slugify(text: string): string {
 
 export interface CreateWorkspaceParams {
   name: string;
-  slug?: string;
+  slug?: string | undefined;
   creatorUserId: string;
 }
 

@@ -19,6 +19,7 @@ import {
 import { projectRoutes } from "./modules/projects/project.routes.js";
 import { readinessRoutes } from "./routes/readiness.routes.js";
 import type { AccessTokenService } from "./modules/auth/security/jwt.service.js";
+import { JwtAccessTokenService } from "./modules/auth/security/jwt.service.js";
 import { authenticationPlugin } from "./modules/auth/plugins/authentication.plugin.js";
 import { InMemoryWorkspaceRepository } from "./modules/workspaces/repositories/memory/in-memory-workspace.repository.js";
 import type { WorkspaceRepository } from "./modules/workspaces/workspace.repository.js";
@@ -26,6 +27,9 @@ import { WorkspaceService } from "./modules/workspaces/services/workspace.servic
 import { workspaceRoutes } from "./modules/workspaces/routes/workspace.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
+
+const DEFAULT_JWT_SECRET =
+  "devforge-default-development-jwt-signing-secret-key-32bytes";
 
 function isValidationError(
   error: unknown,
@@ -80,15 +84,18 @@ export function buildApp(
     ...options.serverOptions,
   });
 
-  if (options.accessTokenService) {
-    void app.register(
-      authenticationPlugin,
-      {
-        accessTokens:
-          options.accessTokenService,
-      },
-    );
-  }
+  const accessTokenService =
+    options.accessTokenService ??
+    new JwtAccessTokenService({
+      secret: DEFAULT_JWT_SECRET,
+      issuer: "devforge",
+      audience: "devforge-api",
+      expiresInSeconds: 900,
+    });
+
+  void app.register(authenticationPlugin, {
+    accessTokens: accessTokenService,
+  });
 
   const projectRepository =
     options.projectRepository ??
@@ -111,6 +118,21 @@ export function buildApp(
           "Backend API for the DevForge developer operating system.",
         version: "0.1.0",
       },
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT",
+            description: "Enter your DevForge JWT access token.",
+          },
+        },
+      },
+      security: [
+        {
+          bearerAuth: [],
+        },
+      ],
       tags: [
         {
           name: "System",

@@ -32,10 +32,7 @@ export function createWorkspaceTenantGuard(workspaceService: WorkspaceService) {
     request: FastifyRequest<{ Params: { workspaceId?: string } }>,
     reply: FastifyReply,
   ) {
-    const userId =
-      request.auth?.userId ?? (request.headers["x-user-id"] as string | undefined);
-
-    if (!userId) {
+    if (!request.auth) {
       return reply.code(401).send({
         error: "UNAUTHORIZED",
         message: "Authentication required to access workspace resources.",
@@ -43,6 +40,7 @@ export function createWorkspaceTenantGuard(workspaceService: WorkspaceService) {
       });
     }
 
+    const userId = request.auth.userId;
     const workspaceId =
       request.params?.workspaceId ?? (request.headers["x-workspace-id"] as string | undefined);
 

@@ -12,6 +12,7 @@ import {
 } from "../workspace.errors.js";
 import type { WorkspaceService } from "../services/workspace.service.js";
 import type { WorkspaceRole } from "../workspace.types.js";
+import { requireAuth } from "../../auth/guards/require-auth.guard.js";
 
 export interface WorkspaceRoutesOptions {
   service: WorkspaceService;
@@ -23,22 +24,12 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
 ) => {
   const { service } = options;
 
-  app.addHook("preHandler", async (request, reply) => {
-    const userId =
-      request.auth?.userId ?? (request.headers["x-user-id"] as string | undefined);
-    if (!userId) {
-      return reply.code(401).send({
-        error: "UNAUTHORIZED",
-        message: "Authentication required to access workspaces.",
-        requestId: request.id,
-      });
-    }
-  });
+  app.addHook("preHandler", requireAuth);
 
   app.post<{
     Body: { name: string; slug?: string };
   }>("/", { schema: createWorkspaceSchema }, async (request, reply) => {
-    const userId = (request.auth?.userId ?? request.headers["x-user-id"]) as string;
+    const userId = request.auth!.userId;
     try {
       const workspace = await service.createWorkspace({
         name: request.body.name,
@@ -59,7 +50,7 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
   });
 
   app.get("/", { schema: listWorkspacesSchema }, async (request, reply) => {
-    const userId = (request.auth?.userId ?? request.headers["x-user-id"]) as string;
+    const userId = request.auth!.userId;
     const workspaces = await service.listUserWorkspaces(userId);
     return reply.code(200).send({ data: workspaces });
   });
@@ -67,7 +58,7 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
   app.get<{
     Params: { workspaceId: string };
   }>("/:workspaceId", { schema: getWorkspaceSchema }, async (request, reply) => {
-    const userId = (request.auth?.userId ?? request.headers["x-user-id"]) as string;
+    const userId = request.auth!.userId;
     try {
       const workspace = await service.getWorkspaceForUser(
         request.params.workspaceId,
@@ -89,7 +80,7 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
     Params: { workspaceId: string };
     Body: { userId: string; role: WorkspaceRole };
   }>("/:workspaceId/members", { schema: addWorkspaceMemberSchema }, async (request, reply) => {
-    const actorUserId = (request.auth?.userId ?? request.headers["x-user-id"]) as string;
+    const actorUserId = request.auth!.userId;
     try {
       const member = await service.addMember({
         workspaceId: request.params.workspaceId,

@@ -4,6 +4,19 @@ import test from "node:test";
 import { buildApp } from "../../../app.js";
 import { InMemoryWorkspaceRepository } from "../repositories/memory/in-memory-workspace.repository.js";
 import { WorkspaceService } from "../services/workspace.service.js";
+import { JwtAccessTokenService } from "../../auth/security/jwt.service.js";
+
+const tokenService = new JwtAccessTokenService({
+  secret: "devforge-default-development-jwt-signing-secret-key-32bytes",
+  issuer: "devforge",
+  audience: "devforge-api",
+  expiresInSeconds: 900,
+});
+
+async function getAuthHeader(userId: string) {
+  const token = await tokenService.issue({ userId, sessionId: "session-1" });
+  return { authorization: `Bearer ${token}` };
+}
 
 test("POST /api/workspaces returns 401 when unauthenticated", async (t) => {
   const app = buildApp({
@@ -38,10 +51,12 @@ test("POST /api/workspaces creates a workspace and returns 201", async (t) => {
     await app.close();
   });
 
+  const authHeader = await getAuthHeader("user-1");
+
   const response = await app.inject({
     method: "POST",
     url: "/api/workspaces",
-    headers: { "x-user-id": "user-1" },
+    headers: authHeader,
     payload: { name: "DevForge Organization" },
   });
 
@@ -73,10 +88,12 @@ test("POST /api/workspaces returns 409 for duplicate slug", async (t) => {
     creatorUserId: "user-1",
   });
 
+  const authHeader = await getAuthHeader("user-2");
+
   const response = await app.inject({
     method: "POST",
     url: "/api/workspaces",
-    headers: { "x-user-id": "user-2" },
+    headers: authHeader,
     payload: { name: "DevForge Duplicate", slug: "devforge" },
   });
 
@@ -101,10 +118,12 @@ test("GET /api/workspaces returns workspaces for the authenticated user", async 
   await service.createWorkspace({ name: "Workspace One", creatorUserId: "user-1" });
   await service.createWorkspace({ name: "Workspace Two", creatorUserId: "user-2" });
 
+  const authHeader = await getAuthHeader("user-1");
+
   const response = await app.inject({
     method: "GET",
     url: "/api/workspaces",
-    headers: { "x-user-id": "user-1" },
+    headers: authHeader,
   });
 
   assert.equal(response.statusCode, 200);
@@ -129,10 +148,12 @@ test("GET /api/workspaces/:workspaceId returns 404 for non-members", async (t) =
 
   const ws = await service.createWorkspace({ name: "Private Org", creatorUserId: "owner-1" });
 
+  const authHeader = await getAuthHeader("outsider-1");
+
   const response = await app.inject({
     method: "GET",
     url: `/api/workspaces/${ws.id}`,
-    headers: { "x-user-id": "outsider-1" },
+    headers: authHeader,
   });
 
   assert.equal(response.statusCode, 404);
@@ -155,10 +176,12 @@ test("POST /api/workspaces/:workspaceId/members adds a member when caller is OWN
 
   const ws = await service.createWorkspace({ name: "Team Org", creatorUserId: "owner-1" });
 
+  const authHeader = await getAuthHeader("owner-1");
+
   const response = await app.inject({
     method: "POST",
     url: `/api/workspaces/${ws.id}/members`,
-    headers: { "x-user-id": "owner-1" },
+    headers: authHeader,
     payload: { userId: "new-member-1", role: "MEMBER" },
   });
 

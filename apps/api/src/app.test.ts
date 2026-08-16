@@ -8,6 +8,7 @@ import {
 import { InMemoryProjectRepository } from "./modules/projects/project.repository.js";
 import { InMemoryWorkspaceRepository } from "./modules/workspaces/repositories/memory/in-memory-workspace.repository.js";
 import { WorkspaceService } from "./modules/workspaces/services/workspace.service.js";
+import { JwtAccessTokenService } from "./modules/auth/security/jwt.service.js";
 
 test("GET /health returns the API health status", async (t) => {
   const app = buildApp({
@@ -122,6 +123,13 @@ test("unexpected repository errors return a safe 500 response", async (t) => {
     }
   }
 
+  const accessTokenService = new JwtAccessTokenService({
+    secret: "devforge-default-development-jwt-signing-secret-key-32bytes",
+    issuer: "devforge",
+    audience: "devforge-api",
+    expiresInSeconds: 900,
+  });
+
   const workspaceRepository = new InMemoryWorkspaceRepository();
   const workspaceService = new WorkspaceService(workspaceRepository);
 
@@ -129,6 +137,7 @@ test("unexpected repository errors return a safe 500 response", async (t) => {
     serverOptions: {
       logger: false,
     },
+    accessTokenService,
     projectRepository: new FailingProjectRepository(),
     workspaceRepository,
     workspaceService,
@@ -143,10 +152,15 @@ test("unexpected repository errors return a safe 500 response", async (t) => {
     creatorUserId: "user-1",
   });
 
+  const token = await accessTokenService.issue({
+    userId: "user-1",
+    sessionId: "session-1",
+  });
+
   const response = await app.inject({
     method: "GET",
     url: `/api/workspaces/${workspace.id}/projects`,
-    headers: { "x-user-id": "user-1" },
+    headers: { authorization: `Bearer ${token}` },
   });
 
   assert.equal(response.statusCode, 500);

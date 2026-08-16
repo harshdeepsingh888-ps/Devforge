@@ -9,12 +9,27 @@ import {
   createWorkspaceTenantGuard,
   requireWorkspaceRole,
 } from "./workspace-tenant.plugin.js";
+import { JwtAccessTokenService } from "../../auth/security/jwt.service.js";
+import { authenticationPlugin } from "../../auth/plugins/authentication.plugin.js";
+
+const tokenService = new JwtAccessTokenService({
+  secret: "devforge-default-development-jwt-signing-secret-key-32bytes",
+  issuer: "devforge",
+  audience: "devforge-api",
+  expiresInSeconds: 900,
+});
+
+async function getAuthHeader(userId: string) {
+  const token = await tokenService.issue({ userId, sessionId: "session-1" });
+  return { authorization: `Bearer ${token}` };
+}
 
 test("requireWorkspaceMember blocks unauthenticated requests with 401", async (t) => {
   const repository = new InMemoryWorkspaceRepository();
   const service = new WorkspaceService(repository);
   const app = Fastify();
 
+  await app.register(authenticationPlugin, { accessTokens: tokenService });
   await app.register(workspaceTenantPlugin, { workspaceService: service });
   const requireMember = createWorkspaceTenantGuard(service);
 
@@ -40,6 +55,7 @@ test("requireWorkspaceMember returns 404 for non-members", async (t) => {
   const service = new WorkspaceService(repository);
   const app = Fastify();
 
+  await app.register(authenticationPlugin, { accessTokens: tokenService });
   await app.register(workspaceTenantPlugin, { workspaceService: service });
   const requireMember = createWorkspaceTenantGuard(service);
 
@@ -53,10 +69,12 @@ test("requireWorkspaceMember returns 404 for non-members", async (t) => {
     await app.close();
   });
 
+  const authHeader = await getAuthHeader("outsider-user");
+
   const response = await app.inject({
     method: "GET",
     url: `/workspaces/${ws.id}/test`,
-    headers: { "x-user-id": "outsider-user" },
+    headers: authHeader,
   });
 
   assert.equal(response.statusCode, 404);
@@ -68,6 +86,7 @@ test("requireWorkspaceMember populates request.workspaceContext for valid member
   const service = new WorkspaceService(repository);
   const app = Fastify();
 
+  await app.register(authenticationPlugin, { accessTokens: tokenService });
   await app.register(workspaceTenantPlugin, { workspaceService: service });
   const requireMember = createWorkspaceTenantGuard(service);
 
@@ -83,10 +102,12 @@ test("requireWorkspaceMember populates request.workspaceContext for valid member
     await app.close();
   });
 
+  const authHeader = await getAuthHeader("user-1");
+
   const response = await app.inject({
     method: "GET",
     url: `/workspaces/${ws.id}/test`,
-    headers: { "x-user-id": "user-1" },
+    headers: authHeader,
   });
 
   assert.equal(response.statusCode, 200);
@@ -101,6 +122,7 @@ test("requireWorkspaceRole enforces role requirements (OWNER vs MEMBER)", async 
   const service = new WorkspaceService(repository);
   const app = Fastify();
 
+  await app.register(authenticationPlugin, { accessTokens: tokenService });
   await app.register(workspaceTenantPlugin, { workspaceService: service });
   const requireMember = createWorkspaceTenantGuard(service);
   const requireOwner = requireWorkspaceRole("OWNER");
@@ -123,11 +145,14 @@ test("requireWorkspaceRole enforces role requirements (OWNER vs MEMBER)", async 
     await app.close();
   });
 
+  const memberAuth = await getAuthHeader("member-1");
+  const ownerAuth = await getAuthHeader("owner-1");
+
   // Call as MEMBER -> 403 Forbidden
   const memberRes = await app.inject({
     method: "DELETE",
     url: `/workspaces/${ws.id}/admin`,
-    headers: { "x-user-id": "member-1" },
+    headers: memberAuth,
   });
   assert.equal(memberRes.statusCode, 403);
   assert.equal(memberRes.json().error, "FORBIDDEN");
@@ -136,7 +161,7 @@ test("requireWorkspaceRole enforces role requirements (OWNER vs MEMBER)", async 
   const ownerRes = await app.inject({
     method: "DELETE",
     url: `/workspaces/${ws.id}/admin`,
-    headers: { "x-user-id": "owner-1" },
+    headers: ownerAuth,
   });
   assert.equal(ownerRes.statusCode, 200);
   assert.equal(ownerRes.json().adminAction, "completed");

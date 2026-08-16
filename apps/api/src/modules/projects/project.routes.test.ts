@@ -5,6 +5,19 @@ import { buildApp } from "../../app.js";
 import { InMemoryProjectRepository } from "./project.repository.js";
 import { InMemoryWorkspaceRepository } from "../workspaces/repositories/memory/in-memory-workspace.repository.js";
 import { WorkspaceService } from "../workspaces/services/workspace.service.js";
+import { JwtAccessTokenService } from "../auth/security/jwt.service.js";
+
+const tokenService = new JwtAccessTokenService({
+  secret: "devforge-default-development-jwt-signing-secret-key-32bytes",
+  issuer: "devforge",
+  audience: "devforge-api",
+  expiresInSeconds: 900,
+});
+
+async function getAuthHeader(userId: string) {
+  const token = await tokenService.issue({ userId, sessionId: "session-1" });
+  return { authorization: `Bearer ${token}` };
+}
 
 async function createTestSetup() {
   const projectRepository = new InMemoryProjectRepository();
@@ -48,10 +61,12 @@ test("GET /api/workspaces/:workspaceId/projects returns 404 for non-members", as
     await app.close();
   });
 
+  const authHeader = await getAuthHeader("outsider-user");
+
   const response = await app.inject({
     method: "GET",
     url: `/api/workspaces/${workspace.id}/projects`,
-    headers: { "x-user-id": "outsider-user" },
+    headers: authHeader,
   });
 
   assert.equal(response.statusCode, 404);
@@ -64,10 +79,12 @@ test("POST and GET /api/workspaces/:workspaceId/projects creates and lists tenan
     await app.close();
   });
 
+  const authHeader = await getAuthHeader("user-owner-1");
+
   const createRes = await app.inject({
     method: "POST",
     url: `/api/workspaces/${workspace.id}/projects`,
-    headers: { "x-user-id": "user-owner-1" },
+    headers: authHeader,
     payload: {
       name: "DevForge API Core",
       description: "Fastify backend engine",
@@ -82,7 +99,7 @@ test("POST and GET /api/workspaces/:workspaceId/projects creates and lists tenan
   const listRes = await app.inject({
     method: "GET",
     url: `/api/workspaces/${workspace.id}/projects`,
-    headers: { "x-user-id": "user-owner-1" },
+    headers: authHeader,
   });
 
   assert.equal(listRes.statusCode, 200);
@@ -112,11 +129,13 @@ test("enforces tenant isolation across multiple workspaces", async (t) => {
     name: "Workspace 2 Project",
   });
 
+  const owner1Header = await getAuthHeader("user-owner-1");
+
   // User 1 lists projects in Workspace 1 -> receives only Workspace 1 Project
   const ws1Res = await app.inject({
     method: "GET",
     url: `/api/workspaces/${ws1.id}/projects`,
-    headers: { "x-user-id": "user-owner-1" },
+    headers: owner1Header,
   });
 
   assert.equal(ws1Res.statusCode, 200);
@@ -128,7 +147,7 @@ test("enforces tenant isolation across multiple workspaces", async (t) => {
   const forbiddenRes = await app.inject({
     method: "GET",
     url: `/api/workspaces/${ws2.id}/projects`,
-    headers: { "x-user-id": "user-owner-1" },
+    headers: owner1Header,
   });
 
   assert.equal(forbiddenRes.statusCode, 404);
@@ -146,10 +165,12 @@ test("PATCH /api/workspaces/:workspaceId/projects/:projectId/status updates stat
     name: "Project to Pause",
   });
 
+  const authHeader = await getAuthHeader("user-owner-1");
+
   const patchRes = await app.inject({
     method: "PATCH",
     url: `/api/workspaces/${workspace.id}/projects/${project.id}/status`,
-    headers: { "x-user-id": "user-owner-1" },
+    headers: authHeader,
     payload: { status: "PAUSED" },
   });
 

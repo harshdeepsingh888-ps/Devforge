@@ -69,3 +69,21 @@ export class TeamSlugAlreadyExistsError extends Error {
     this.name = "TeamSlugAlreadyExistsError";
   }
 }
+
+export class TeamMemberAlreadyExistsError extends Error {
+  readonly code = "TEAM_MEMBER_ALREADY_EXISTS";
+
+  constructor() {
+    super("User is already a member of this team.");
+    this.name = "TeamMemberAlreadyExistsError";
+  }
+}
+
+export class TeamMemberNotFoundError extends Error {
+  readonly code = "TEAM_MEMBER_NOT_FOUND";
+
+  constructor() {
+    super("Team member not found.");
+    this.name = "TeamMemberNotFoundError";
+  }
+}

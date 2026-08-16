@@ -33,8 +33,9 @@ model User {
   displayName  String
   avatarUrl    String?
 
-  memberships WorkspaceMember[]
-  sessions Session[]
+  memberships     WorkspaceMember[]
+  sessions        Session[]
+  teamMemberships TeamMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -59,13 +60,27 @@ model Team {
   name        String
   slug        String
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members   TeamMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
+}
+
+model TeamMember {
+  teamId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([userId])
+  @@index([teamId])
 }
 
 model WorkspaceMember {

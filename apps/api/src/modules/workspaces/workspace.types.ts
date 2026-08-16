@@ -70,3 +70,14 @@ export interface CreateTeamInput {
   name: string;
   slug: string;
 }
+
+export interface TeamMember {
+  teamId: string;
+  userId: string;
+  createdAt: string;
+}
+
+export interface AddTeamMemberInput {
+  teamId: string;
+  userId: string;
+}

@@ -1,4 +1,4 @@
-import type { CreateTeamInput, Team } from "../workspace.types.js";
+import type { CreateTeamInput, Team, TeamMember } from "../workspace.types.js";
 
 export interface TeamRepository {
   create(input: CreateTeamInput): Promise<Team>;
@@ -15,5 +15,29 @@ export interface TeamRepository {
 
   findAllByWorkspaceId(
     workspaceId: string,
+  ): Promise<Team[]>;
+
+  addMember(
+    teamId: string,
+    userId: string,
+  ): Promise<TeamMember>;
+
+  removeMember(
+    teamId: string,
+    userId: string,
+  ): Promise<boolean>;
+
+  findMember(
+    teamId: string,
+    userId: string,
+  ): Promise<TeamMember | null>;
+
+  listMembers(
+    teamId: string,
+  ): Promise<TeamMember[]>;
+
+  findTeamsForUser(
+    workspaceId: string,
+    userId: string,
   ): Promise<Team[]>;
 }

@@ -41,6 +41,69 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
     }
 
     this.workflows.set(workflow.id, workflow);
+
+    // Automatically seed default states & transitions for new workflow
+    const backlogState: WorkflowState = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      name: "Backlog",
+      category: "BACKLOG",
+      position: 0,
+      isInitial: true,
+      isTerminal: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.states.set(backlogState.id, backlogState);
+
+    const inProgressState: WorkflowState = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      name: "In Progress",
+      category: "STARTED",
+      position: 1,
+      isInitial: false,
+      isTerminal: false,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.states.set(inProgressState.id, inProgressState);
+
+    const doneState: WorkflowState = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      name: "Done",
+      category: "COMPLETED",
+      position: 2,
+      isInitial: false,
+      isTerminal: true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.states.set(doneState.id, doneState);
+
+    const t1: StateTransition = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      fromStateId: backlogState.id,
+      toStateId: inProgressState.id,
+      name: null,
+      requiredRole: null,
+      createdAt: timestamp,
+    };
+    this.transitions.set(t1.id, t1);
+
+    const t2: StateTransition = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      fromStateId: inProgressState.id,
+      toStateId: doneState.id,
+      name: null,
+      requiredRole: null,
+      createdAt: timestamp,
+    };
+    this.transitions.set(t2.id, t2);
+
     return workflow;
   }
 

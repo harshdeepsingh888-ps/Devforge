@@ -25,6 +25,18 @@ import { InMemoryWorkspaceRepository } from "./modules/workspaces/repositories/m
 import type { WorkspaceRepository } from "./modules/workspaces/workspace.repository.js";
 import { WorkspaceService } from "./modules/workspaces/services/workspace.service.js";
 import { workspaceRoutes } from "./modules/workspaces/routes/workspace.routes.js";
+import { InMemoryTeamRepository } from "./modules/workspaces/repositories/memory/in-memory-team.repository.js";
+import type { TeamRepository } from "./modules/workspaces/repositories/team.repository.js";
+import { InMemoryWorkflowRepository } from "./modules/work-management/repositories/memory/in-memory-workflow.repository.js";
+import type { WorkflowRepository } from "./modules/work-management/repositories/workflow.repository.js";
+import { InMemoryWorkItemRepository } from "./modules/work-management/repositories/memory/in-memory-work-item.repository.js";
+import type { WorkItemRepository } from "./modules/work-management/repositories/work-item.repository.js";
+import { InMemoryCommentRepository } from "./modules/work-management/repositories/memory/in-memory-comment.repository.js";
+import type { CommentRepository } from "./modules/work-management/repositories/comment.repository.js";
+import { InMemoryWorkItemHistoryRepository } from "./modules/work-management/repositories/memory/in-memory-work-item-history.repository.js";
+import type { WorkItemHistoryRepository } from "./modules/work-management/repositories/work-item-history.repository.js";
+import { WorkItemService } from "./modules/work-management/services/work-item.service.js";
+import { workManagementRoutes } from "./modules/work-management/work-management.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -62,6 +74,12 @@ export interface BuildAppOptions {
   projectRepository?: ProjectRepository;
   workspaceRepository?: WorkspaceRepository;
   workspaceService?: WorkspaceService;
+  teamRepository?: TeamRepository;
+  workflowRepository?: WorkflowRepository;
+  workItemRepository?: WorkItemRepository;
+  commentRepository?: CommentRepository;
+  workItemHistoryRepository?: WorkItemHistoryRepository;
+  workItemService?: WorkItemService;
   authenticationService?:
     AuthenticationServiceContract;
   accessTokenService?: AccessTokenService;
@@ -109,6 +127,33 @@ export function buildApp(
     options.workspaceService ??
     new WorkspaceService(workspaceRepository);
 
+  const teamRepository =
+    options.teamRepository ?? new InMemoryTeamRepository();
+
+  const workflowRepository =
+    options.workflowRepository ?? new InMemoryWorkflowRepository();
+
+  const workItemRepository =
+    options.workItemRepository ?? new InMemoryWorkItemRepository();
+
+  const commentRepository =
+    options.commentRepository ?? new InMemoryCommentRepository();
+
+  const workItemHistoryRepository =
+    options.workItemHistoryRepository ?? new InMemoryWorkItemHistoryRepository();
+
+  const workItemService =
+    options.workItemService ??
+    new WorkItemService(
+      workItemRepository,
+      workflowRepository,
+      workspaceRepository,
+      projectRepository,
+      teamRepository,
+      commentRepository,
+      workItemHistoryRepository,
+    );
+
   void app.register(swagger, {
     openapi: {
       openapi: "3.0.3",
@@ -153,6 +198,11 @@ export function buildApp(
           name: "Projects",
           description:
             "DevForge project management endpoints.",
+        },
+        {
+          name: "Work Management",
+          description:
+            "DevForge work items, hierarchy, state transitions, workflows, and comments endpoints.",
         },
       ],
     },
@@ -302,6 +352,19 @@ export function buildApp(
           prefix: "/api/workspaces/:workspaceId/projects",
           repository: projectRepository,
           workspaceService,
+        },
+      );
+
+      await application.register(
+        workManagementRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId",
+          workspaceService,
+          workItemService,
+          workflowRepository,
+          workItemRepository,
+          commentRepository,
+          workItemHistoryRepository,
         },
       );
     },

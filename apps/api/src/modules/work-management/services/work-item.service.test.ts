@@ -81,54 +81,15 @@ async function setupTestContext() {
     isDefault: true,
   });
 
-  const backlogState = await workflowRepo.createState({
-    workflowId: defaultWorkflow.id,
-    name: "Backlog",
-    category: "BACKLOG",
-    position: 0,
-    isInitial: true,
-  });
+  const states = await workflowRepo.findStatesByWorkflow(defaultWorkflow.id);
+  const backlogState = states[0]!;
+  const inProgressState = states[1]!;
+  const doneState = states[2]!;
 
-  const inProgressState = await workflowRepo.createState({
-    workflowId: defaultWorkflow.id,
-    name: "In Progress",
-    category: "STARTED",
-    position: 1,
-  });
-
-  const doneState = await workflowRepo.createState({
-    workflowId: defaultWorkflow.id,
-    name: "Done",
-    category: "COMPLETED",
-    position: 2,
-    isTerminal: true,
-  });
-
-  // Add allowed transitions: Backlog -> In Progress -> Done
-  await workflowRepo.createTransition({
-    workflowId: defaultWorkflow.id,
-    fromStateId: backlogState.id,
-    toStateId: inProgressState.id,
-  });
-
-  await workflowRepo.createTransition({
-    workflowId: defaultWorkflow.id,
-    fromStateId: inProgressState.id,
-    toStateId: doneState.id,
-  });
-
-  const ws2Workflow = await workflowRepo.createWorkflow({
+  await workflowRepo.createWorkflow({
     workspaceId: ws2.id,
     name: "WS2 Default Workflow",
     isDefault: true,
-  });
-
-  await workflowRepo.createState({
-    workflowId: ws2Workflow.id,
-    name: "Backlog",
-    category: "BACKLOG",
-    position: 0,
-    isInitial: true,
   });
 
   return {

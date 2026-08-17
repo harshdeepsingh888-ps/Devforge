@@ -40,10 +40,14 @@ model User {
   displayName  String
   avatarUrl    String?
 
-  memberships     WorkspaceMember[]
-  sessions        Session[]
-  teamMemberships TeamMember[]
-  sentInvitations WorkspaceInvitation[]
+  memberships        WorkspaceMember[]
+  sessions           Session[]
+  teamMemberships    TeamMember[]
+  sentInvitations    WorkspaceInvitation[]
+  assignedWorkItems  WorkItem[]            @relation("AssignedWorkItems")
+  reportedWorkItems  WorkItem[]            @relation("ReportedWorkItems")
+  comments           Comment[]
+  workItemHistory    WorkItemHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -54,10 +58,14 @@ model Workspace {
   name String
   slug String @unique
 
-  members     WorkspaceMember[]
-  projects    Project[]
-  teams       Team[]
-  invitations WorkspaceInvitation[]
+  members          WorkspaceMember[]
+  projects         Project[]
+  teams            Team[]
+  invitations      WorkspaceInvitation[]
+  workflows        Workflow[]
+  workItems        WorkItem[]
+  comments         Comment[]
+  workItemHistory  WorkItemHistory[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -71,6 +79,7 @@ model Team {
 
   workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   members   TeamMember[]
+  workItems WorkItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,7 +122,9 @@ model Project {
   description String?
   status      ProjectStatus @default(ACTIVE)
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflows Workflow[]
+  workItems WorkItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -160,4 +171,175 @@ model WorkspaceInvitation {
 
   @@index([workspaceId, email])
   @@index([tokenHash])
+}
+
+enum WorkItemType {
+  EPIC
+  FEATURE
+  TASK
+  BUG
+}
+
+enum WorkItemPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum StateCategory {
+  BACKLOG
+  UNSTARTED
+  STARTED
+  COMPLETED
+  CANCELED
+}
+
+enum WorkItemAction {
+  CREATED
+  UPDATED
+  TRANSITIONED
+  ASSIGNED
+  COMMENTED
+  ARCHIVED
+}
+
+model Workflow {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectId   String?
+  name        String
+  isDefault   Boolean  @default(false)
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  states    WorkflowState[]
+  transitions StateTransition[]
+  workItems   WorkItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, projectId])
+}
+
+model WorkflowState {
+  id         String        @id @default(cuid())
+  workflowId String
+  name       String
+  category   StateCategory @default(UNSTARTED)
+  position   Int           @default(0)
+  isInitial  Boolean       @default(false)
+  isTerminal Boolean       @default(false)
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  fromTransitions StateTransition[] @relation("FromState")
+  toTransitions   StateTransition[] @relation("ToState")
+  workItems       WorkItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([workflowId, position])
+}
+
+model StateTransition {
+  id           String         @id @default(cuid())
+  workflowId   String
+  fromStateId  String
+  toStateId    String
+  name         String?
+  requiredRole WorkspaceRole?
+
+  workflow  Workflow      @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  fromState WorkflowState @relation("FromState", fields: [fromStateId], references: [id], onDelete: Cascade)
+  toState   WorkflowState @relation("ToState", fields: [toStateId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([workflowId, fromStateId, toStateId])
+  @@index([workflowId])
+}
+
+model WorkItem {
+  id              String           @id @default(cuid())
+  workspaceId     String
+  projectId       String
+  type            WorkItemType
+  title           String
+  description     String?
+  parentId        String?
+  workflowStateId String
+  workflowId      String
+  assigneeUserId  String?
+  teamId          String?
+  reporterUserId  String
+  priority        WorkItemPriority @default(MEDIUM)
+  storyPoints     Int?
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace     Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workflow      Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowState WorkflowState     @relation(fields: [workflowStateId], references: [id], onDelete: Restrict)
+  parent        WorkItem?         @relation("WorkItemHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children      WorkItem[]        @relation("WorkItemHierarchy")
+  assignee      User?             @relation("AssignedWorkItems", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  reporter      User              @relation("ReportedWorkItems", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  team          Team?             @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  comments      Comment[]
+  history       WorkItemHistory[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, projectId])
+  @@index([workspaceId, assigneeUserId])
+  @@index([workspaceId, teamId])
+  @@index([workspaceId, workflowStateId])
+  @@index([parentId])
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  workItemId   String
+  authorUserId String
+  content      String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workItem  WorkItem  @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId, workItemId])
+  @@index([authorUserId])
+}
+
+model WorkItemHistory {
+  id                 String         @id @default(cuid())
+  workspaceId        String
+  workItemId         String
+  actorUserId        String
+  action             WorkItemAction
+  fromStateId        String?
+  toStateId          String?
+  fromAssigneeUserId String?
+  toAssigneeUserId   String?
+  metadataJson       String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workItem  WorkItem  @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  actor     User      @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId, workItemId])
+  @@index([workspaceId, createdAt])
 }

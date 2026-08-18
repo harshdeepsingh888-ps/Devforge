@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: devforge-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: devforge_user
+      POSTGRES_PASSWORD: devforge@2005
+      POSTGRES_DB: devforge
+    ports:
+      - '5432:5432'
+    volumes:
+      - devforge-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U devforge_user -d devforge']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  devforge-postgres-data:

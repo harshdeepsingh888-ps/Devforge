@@ -10,7 +10,13 @@
         "build": "tsc",
         "start": "node dist/server.js",
         "typecheck": "tsc --noEmit",
-        "test": "node --env-file=.env --import tsx --test \"src/**/*.test.ts\""
+        "test": "node --env-file=.env --import tsx --test \"src/**/*.test.ts\"",
+        "db:up": "docker compose up -d",
+        "db:down": "docker compose down",
+        "db:migrate": "prisma migrate deploy",
+        "db:reset": "prisma migrate reset --force",
+        "db:generate": "prisma generate",
+        "db:setup": "npm run db:up && npm run db:migrate && npm run db:generate"
     },
     "engines": {
         "node": ">=24"

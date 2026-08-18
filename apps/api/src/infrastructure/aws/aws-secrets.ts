@@ -33,3 +33,21 @@ export async function fetchAwsSecrets(): Promise<Record<string, string>> {
     );
   }
 }
+
+/**
+ * Startup hook: Call once at server startup to cache Secrets Manager values in memory
+ * and inject them into process.env, guaranteeing zero per-request AWS Secrets Manager network calls.
+ */
+export async function initializeAwsSecretsAtStartup(): Promise<Record<string, string>> {
+  if (process.env.NODE_ENV !== "production" && !process.env.AWS_SECRETS_NAME) {
+    return {};
+  }
+
+  const secrets = await fetchAwsSecrets();
+  for (const [key, value] of Object.entries(secrets)) {
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+  return secrets;
+}

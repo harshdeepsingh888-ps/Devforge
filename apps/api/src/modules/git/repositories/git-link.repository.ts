@@ -15,6 +15,10 @@ export interface GitLinkRepository {
     commitId: string,
     workspaceId: string,
   ): Promise<CommitWorkItemLink[]>;
+  getCommitsForWorkItem(
+    workItemId: string,
+    workspaceId: string,
+  ): Promise<CommitWorkItemLink[]>;
   getAdrsForCommit(
     commitId: string,
     workspaceId: string,

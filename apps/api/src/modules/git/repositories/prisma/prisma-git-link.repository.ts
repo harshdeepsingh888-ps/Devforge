@@ -1,7 +1,7 @@
 import type { PrismaClient } from "../../../../generated/prisma/client.js";
 import { DuplicateCommitLinkError } from "../../git.errors.js";
 import type { CommitAdrLink, CommitWorkItemLink } from "../../git.types.js";
-import type { GitLinkRepository } from "../git-link.repository.ts";
+import type { GitLinkRepository } from "../git-link.repository.js";
 
 export class PrismaGitLinkRepository implements GitLinkRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -73,6 +73,25 @@ export class PrismaGitLinkRepository implements GitLinkRepository {
     const links = await this.prisma.commitWorkItemLink.findMany({
       where: {
         commitId,
+        workspaceId,
+      },
+    });
+
+    return links.map((l) => ({
+      commitId: l.commitId,
+      workItemId: l.workItemId,
+      workspaceId: l.workspaceId,
+      createdAt: l.createdAt.toISOString(),
+    }));
+  }
+
+  async getCommitsForWorkItem(
+    workItemId: string,
+    workspaceId: string,
+  ): Promise<CommitWorkItemLink[]> {
+    const links = await this.prisma.commitWorkItemLink.findMany({
+      where: {
+        workItemId,
         workspaceId,
       },
     });

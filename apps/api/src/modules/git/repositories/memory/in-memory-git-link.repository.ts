@@ -1,6 +1,6 @@
 import { DuplicateCommitLinkError } from "../../git.errors.js";
 import type { CommitAdrLink, CommitWorkItemLink } from "../../git.types.js";
-import type { GitLinkRepository } from "../git-link.repository.ts";
+import type { GitLinkRepository } from "../git-link.repository.js";
 
 export class InMemoryGitLinkRepository implements GitLinkRepository {
   private workItemLinks: CommitWorkItemLink[] = [];
@@ -64,6 +64,15 @@ export class InMemoryGitLinkRepository implements GitLinkRepository {
   ): Promise<CommitWorkItemLink[]> {
     return this.workItemLinks
       .filter((l) => l.commitId === commitId && l.workspaceId === workspaceId)
+      .map((l) => ({ ...l }));
+  }
+
+  async getCommitsForWorkItem(
+    workItemId: string,
+    workspaceId: string,
+  ): Promise<CommitWorkItemLink[]> {
+    return this.workItemLinks
+      .filter((l) => l.workItemId === workItemId && l.workspaceId === workspaceId)
       .map((l) => ({ ...l }));
   }
 

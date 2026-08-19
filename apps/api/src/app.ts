@@ -53,6 +53,16 @@ import { InMemoryArchitectureLinkRepository } from "./modules/architecture/repos
 import type { ArchitectureLinkRepository } from "./modules/architecture/repositories/architecture-link.repository.js";
 import { ArchitectureService } from "./modules/architecture/services/architecture.service.js";
 import { architectureRoutes } from "./modules/architecture/routes/architecture.routes.js";
+import { InMemoryPipelineRepository } from "./modules/cicd/repositories/memory/in-memory-pipeline.repository.js";
+import type { PipelineRepository } from "./modules/cicd/repositories/pipeline.repository.js";
+import { InMemoryPipelineRunRepository } from "./modules/cicd/repositories/memory/in-memory-pipeline-run.repository.js";
+import type { PipelineRunRepository } from "./modules/cicd/repositories/pipeline-run.repository.js";
+import { InMemoryBuildLogRepository } from "./modules/cicd/repositories/memory/in-memory-build-log.repository.js";
+import type { BuildLogRepository } from "./modules/cicd/repositories/build-log.repository.js";
+import { InMemoryDeploymentRepository } from "./modules/cicd/repositories/memory/in-memory-deployment.repository.js";
+import type { DeploymentRepository } from "./modules/cicd/repositories/deployment.repository.js";
+import { CicdService } from "./modules/cicd/services/cicd.service.js";
+import { cicdRoutes } from "./modules/cicd/routes/cicd.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -107,6 +117,11 @@ export interface BuildAppOptions {
   specRepository?: TechnicalSpecificationRepository;
   architectureLinkRepository?: ArchitectureLinkRepository;
   architectureService?: ArchitectureService;
+  pipelineRepository?: PipelineRepository;
+  pipelineRunRepository?: PipelineRunRepository;
+  buildLogRepository?: BuildLogRepository;
+  deploymentRepository?: DeploymentRepository;
+  cicdService?: CicdService;
 }
 
 export function buildApp(
@@ -215,6 +230,30 @@ export function buildApp(
       gitLinkRepository,
       workItemRepository,
       adrRepository,
+    );
+
+  const pipelineRepository =
+    options.pipelineRepository ?? new InMemoryPipelineRepository();
+
+  const pipelineRunRepository =
+    options.pipelineRunRepository ?? new InMemoryPipelineRunRepository();
+
+  const buildLogRepository =
+    options.buildLogRepository ?? new InMemoryBuildLogRepository();
+
+  const deploymentRepository =
+    options.deploymentRepository ?? new InMemoryDeploymentRepository();
+
+  const cicdService =
+    options.cicdService ??
+    new CicdService(
+      pipelineRepository,
+      pipelineRunRepository,
+      buildLogRepository,
+      deploymentRepository,
+      commitRepository,
+      projectRepository,
+      gitLinkRepository,
     );
 
   void app.register(swagger, {
@@ -446,6 +485,15 @@ export function buildApp(
           prefix: "/api/workspaces/:workspaceId",
           workspaceService,
           architectureService,
+        },
+      );
+
+      await application.register(
+        cicdRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId",
+          workspaceService,
+          cicdService,
         },
       );
     },

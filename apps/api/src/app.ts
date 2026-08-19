@@ -37,6 +37,16 @@ import { InMemoryWorkItemHistoryRepository } from "./modules/work-management/rep
 import type { WorkItemHistoryRepository } from "./modules/work-management/repositories/work-item-history.repository.js";
 import { WorkItemService } from "./modules/work-management/services/work-item.service.js";
 import { workManagementRoutes } from "./modules/work-management/work-management.routes.js";
+import { InMemoryRepositoryRepository } from "./modules/git/repositories/memory/in-memory-repository.repository.js";
+import type { RepositoryRepository } from "./modules/git/repositories/repository.repository.js";
+import { InMemoryCommitRepository } from "./modules/git/repositories/memory/in-memory-commit.repository.js";
+import type { CommitRepository } from "./modules/git/repositories/commit.repository.js";
+import { InMemoryGitLinkRepository } from "./modules/git/repositories/memory/in-memory-git-link.repository.js";
+import type { GitLinkRepository } from "./modules/git/repositories/git-link.repository.js";
+import { InMemoryArchitectureDecisionRepository } from "./modules/architecture/repositories/memory/in-memory-architecture.repository.js";
+import type { ArchitectureDecisionRepository } from "./modules/architecture/repositories/architecture.repository.js";
+import { GitService } from "./modules/git/services/git.service.js";
+import { gitRoutes } from "./modules/git/routes/git.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -83,6 +93,11 @@ export interface BuildAppOptions {
   authenticationService?:
     AuthenticationServiceContract;
   accessTokenService?: AccessTokenService;
+  gitService?: GitService;
+  repositoryRepository?: RepositoryRepository;
+  commitRepository?: CommitRepository;
+  gitLinkRepository?: GitLinkRepository;
+  adrRepository?: ArchitectureDecisionRepository;
 }
 
 export function buildApp(
@@ -152,6 +167,28 @@ export function buildApp(
       teamRepository,
       commentRepository,
       workItemHistoryRepository,
+    );
+
+  const gitRepositoryRepository =
+    options.repositoryRepository ?? new InMemoryRepositoryRepository();
+
+  const commitRepository =
+    options.commitRepository ?? new InMemoryCommitRepository();
+
+  const gitLinkRepository =
+    options.gitLinkRepository ?? new InMemoryGitLinkRepository();
+
+  const adrRepository =
+    options.adrRepository ?? new InMemoryArchitectureDecisionRepository();
+
+  const gitService =
+    options.gitService ??
+    new GitService(
+      gitRepositoryRepository,
+      commitRepository,
+      gitLinkRepository,
+      workItemRepository,
+      adrRepository,
     );
 
   void app.register(swagger, {
@@ -365,6 +402,15 @@ export function buildApp(
           workItemRepository,
           commentRepository,
           workItemHistoryRepository,
+        },
+      );
+
+      await application.register(
+        gitRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId",
+          workspaceService,
+          gitService,
         },
       );
     },

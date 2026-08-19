@@ -1,12 +1,16 @@
 import { buildApp } from "./app.js";
 import { createAuthenticationModule } from "./modules/auth/auth.module.js";
 import { env, getAuthenticationConfiguration } from "./config/env.js";
+import { prisma } from "./infrastructure/database/prisma.js";
 import { PrismaWorkspaceRepository } from "./modules/workspaces/repositories/prisma/prisma-workspace.repository.js";
 import { PrismaProjectRepository } from "./modules/projects/prisma-project.repository.js";
 import { PrismaWorkItemRepository } from "./modules/work-management/repositories/prisma/prisma-work-item.repository.js";
 import { PrismaWorkflowRepository } from "./modules/work-management/repositories/prisma/prisma-workflow.repository.js";
 import { PrismaCommentRepository } from "./modules/work-management/repositories/prisma/prisma-comment.repository.js";
 import { PrismaWorkItemHistoryRepository } from "./modules/work-management/repositories/prisma/prisma-work-item-history.repository.js";
+import { PrismaRepositoryRepository } from "./modules/git/repositories/prisma/prisma-repository.repository.js";
+import { PrismaCommitRepository } from "./modules/git/repositories/prisma/prisma-commit.repository.js";
+import { PrismaGitLinkRepository } from "./modules/git/repositories/prisma/prisma-git-link.repository.js";
 
 const authenticationModule = createAuthenticationModule(
   getAuthenticationConfiguration(),
@@ -18,6 +22,9 @@ const workItemRepository = new PrismaWorkItemRepository();
 const workflowRepository = new PrismaWorkflowRepository();
 const commentRepository = new PrismaCommentRepository();
 const workItemHistoryRepository = new PrismaWorkItemHistoryRepository();
+const repositoryRepository = new PrismaRepositoryRepository(prisma);
+const commitRepository = new PrismaCommitRepository(prisma);
+const gitLinkRepository = new PrismaGitLinkRepository(prisma);
 
 const app = buildApp({
   authenticationService: authenticationModule.authenticationService,
@@ -28,6 +35,9 @@ const app = buildApp({
   workflowRepository,
   commentRepository,
   workItemHistoryRepository,
+  repositoryRepository,
+  commitRepository,
+  gitLinkRepository,
 });
 
 async function startServer(): Promise<void> {

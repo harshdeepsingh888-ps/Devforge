@@ -47,6 +47,12 @@ import { InMemoryArchitectureDecisionRepository } from "./modules/architecture/r
 import type { ArchitectureDecisionRepository } from "./modules/architecture/repositories/architecture.repository.js";
 import { GitService } from "./modules/git/services/git.service.js";
 import { gitRoutes } from "./modules/git/routes/git.routes.js";
+import { InMemoryTechnicalSpecificationRepository } from "./modules/architecture/repositories/memory/in-memory-spec.repository.js";
+import type { TechnicalSpecificationRepository } from "./modules/architecture/repositories/spec.repository.js";
+import { InMemoryArchitectureLinkRepository } from "./modules/architecture/repositories/memory/in-memory-architecture-link.repository.js";
+import type { ArchitectureLinkRepository } from "./modules/architecture/repositories/architecture-link.repository.js";
+import { ArchitectureService } from "./modules/architecture/services/architecture.service.js";
+import { architectureRoutes } from "./modules/architecture/routes/architecture.routes.js";
 
 export const API_BODY_LIMIT_BYTES = 16 * 1024;
 
@@ -98,6 +104,9 @@ export interface BuildAppOptions {
   commitRepository?: CommitRepository;
   gitLinkRepository?: GitLinkRepository;
   adrRepository?: ArchitectureDecisionRepository;
+  specRepository?: TechnicalSpecificationRepository;
+  architectureLinkRepository?: ArchitectureLinkRepository;
+  architectureService?: ArchitectureService;
 }
 
 export function buildApp(
@@ -180,6 +189,23 @@ export function buildApp(
 
   const adrRepository =
     options.adrRepository ?? new InMemoryArchitectureDecisionRepository();
+
+  const specRepository =
+    options.specRepository ?? new InMemoryTechnicalSpecificationRepository();
+
+  const architectureLinkRepository =
+    options.architectureLinkRepository ?? new InMemoryArchitectureLinkRepository();
+
+  const architectureService =
+    options.architectureService ??
+    new ArchitectureService(
+      adrRepository,
+      specRepository,
+      architectureLinkRepository,
+      workspaceRepository,
+      projectRepository,
+      workItemRepository,
+    );
 
   const gitService =
     options.gitService ??
@@ -411,6 +437,15 @@ export function buildApp(
           prefix: "/api/workspaces/:workspaceId",
           workspaceService,
           gitService,
+        },
+      );
+
+      await application.register(
+        architectureRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId",
+          workspaceService,
+          architectureService,
         },
       );
     },

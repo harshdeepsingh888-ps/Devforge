@@ -81,6 +81,15 @@ export class ArchitectureService {
     return this.adrRepository.create(input);
   }
 
+  async getAdr(
+    workspaceId: string,
+    adrId: string,
+  ): Promise<ArchitectureDecision> {
+    const adr = await this.adrRepository.findById(workspaceId, adrId);
+    if (!adr) throw new AdrNotFoundError();
+    return adr;
+  }
+
   async updateAdr(
     workspaceId: string,
     adrId: string,
@@ -129,6 +138,30 @@ export class ArchitectureService {
     return updated;
   }
 
+  async acceptAdr(
+    workspaceId: string,
+    adrId: string,
+    actorUserId: string,
+  ): Promise<ArchitectureDecision> {
+    return this.updateAdrStatus(workspaceId, adrId, actorUserId, "ACCEPTED");
+  }
+
+  async rejectAdr(
+    workspaceId: string,
+    adrId: string,
+    actorUserId: string,
+  ): Promise<ArchitectureDecision> {
+    return this.updateAdrStatus(workspaceId, adrId, actorUserId, "REJECTED");
+  }
+
+  async deprecateAdr(
+    workspaceId: string,
+    adrId: string,
+    actorUserId: string,
+  ): Promise<ArchitectureDecision> {
+    return this.updateAdrStatus(workspaceId, adrId, actorUserId, "DEPRECATED");
+  }
+
   // --------------------------------------------------------------------------
   // TECHNICAL SPECIFICATION LIFECYCLE
   // --------------------------------------------------------------------------
@@ -147,6 +180,15 @@ export class ArchitectureService {
     }
 
     return this.specRepository.create(input);
+  }
+
+  async getSpec(
+    workspaceId: string,
+    specId: string,
+  ): Promise<TechnicalSpecification> {
+    const spec = await this.specRepository.findById(workspaceId, specId);
+    if (!spec) throw new SpecNotFoundError();
+    return spec;
   }
 
   async updateSpec(
@@ -199,6 +241,22 @@ export class ArchitectureService {
     );
     if (!updated) throw new SpecNotFoundError();
     return updated;
+  }
+
+  async approveSpec(
+    workspaceId: string,
+    specId: string,
+    actorUserId: string,
+  ): Promise<TechnicalSpecification> {
+    return this.updateSpecStatus(workspaceId, specId, actorUserId, "APPROVED");
+  }
+
+  async archiveSpec(
+    workspaceId: string,
+    specId: string,
+    actorUserId: string,
+  ): Promise<TechnicalSpecification> {
+    return this.updateSpecStatus(workspaceId, specId, actorUserId, "ARCHIVED");
   }
 
   // --------------------------------------------------------------------------

@@ -67,6 +67,8 @@ model Workspace {
   comments         Comment[]
   workItemHistory  WorkItemHistory[]
   repositories     Repository[]
+  adrs             ArchitectureDecision[]
+  specs            TechnicalSpecification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -126,6 +128,8 @@ model Project {
   workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workflows Workflow[]
   workItems WorkItem[]
+  adrs      ArchitectureDecision[]
+  specs     TechnicalSpecification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,6 +301,8 @@ model WorkItem {
   comments      Comment[]
   history       WorkItemHistory[]
   commitLinks   CommitWorkItemLink[]
+  specLinks     SpecWorkItemLink[]
+  adrLinks      AdrWorkItemLink[]
 
   @@index([workspaceId])
   @@index([workspaceId, projectId])
@@ -411,11 +417,124 @@ model CommitAdrLink {
   adrId       String
   workspaceId String
 
-  commit Commit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  commit Commit               @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  adr    ArchitectureDecision @relation(fields: [adrId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@id([commitId, adrId])
   @@index([workspaceId])
   @@index([adrId])
+}
+
+enum AdrStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  DEPRECATED
+}
+
+enum SpecStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+model ArchitectureDecision {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  projectId       String?
+  title           String
+  status          AdrStatus @default(PROPOSED)
+  context         String
+  decision        String
+  consequences    String
+  createdByUserId String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  specLinks     AdrSpecLink[]
+  workItemLinks AdrWorkItemLink[]
+  commitLinks   CommitAdrLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, projectId])
+}
+
+model TechnicalSpecification {
+  id              String     @id @default(cuid())
+  workspaceId     String
+  projectId       String
+  title           String
+  summary         String
+  content         String
+  status          SpecStatus @default(DRAFT)
+  createdByUserId String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  adrLinks      AdrSpecLink[]
+  workItemLinks SpecWorkItemLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, projectId])
+}
+
+model AdrSpecLink {
+  id          String @id @default(cuid())
+  workspaceId String
+  adrId       String
+  specId      String
+
+  adr  ArchitectureDecision   @relation(fields: [adrId], references: [id], onDelete: Cascade)
+  spec TechnicalSpecification @relation(fields: [specId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([adrId, specId])
+  @@index([workspaceId])
+  @@index([adrId])
+  @@index([specId])
+}
+
+model SpecWorkItemLink {
+  id          String @id @default(cuid())
+  workspaceId String
+  specId      String
+  workItemId  String
+
+  spec     TechnicalSpecification @relation(fields: [specId], references: [id], onDelete: Cascade)
+  workItem WorkItem               @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([specId, workItemId])
+  @@index([workspaceId])
+  @@index([specId])
+  @@index([workItemId])
+}
+
+model AdrWorkItemLink {
+  id          String @id @default(cuid())
+  workspaceId String
+  adrId       String
+  workItemId  String
+
+  adr      ArchitectureDecision @relation(fields: [adrId], references: [id], onDelete: Cascade)
+  workItem WorkItem             @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([adrId, workItemId])
+  @@index([workspaceId])
+  @@index([adrId])
+  @@index([workItemId])
 }

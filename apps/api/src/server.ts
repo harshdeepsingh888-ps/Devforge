@@ -11,6 +11,9 @@ import { PrismaWorkItemHistoryRepository } from "./modules/work-management/repos
 import { PrismaRepositoryRepository } from "./modules/git/repositories/prisma/prisma-repository.repository.js";
 import { PrismaCommitRepository } from "./modules/git/repositories/prisma/prisma-commit.repository.js";
 import { PrismaGitLinkRepository } from "./modules/git/repositories/prisma/prisma-git-link.repository.js";
+import { PrismaArchitectureDecisionRepository } from "./modules/architecture/repositories/prisma/prisma-architecture.repository.js";
+import { PrismaTechnicalSpecificationRepository } from "./modules/architecture/repositories/prisma/prisma-spec.repository.js";
+import { PrismaArchitectureLinkRepository } from "./modules/architecture/repositories/prisma/prisma-architecture-link.repository.js";
 
 const authenticationModule = createAuthenticationModule(
   getAuthenticationConfiguration(),
@@ -25,6 +28,9 @@ const workItemHistoryRepository = new PrismaWorkItemHistoryRepository();
 const repositoryRepository = new PrismaRepositoryRepository(prisma);
 const commitRepository = new PrismaCommitRepository(prisma);
 const gitLinkRepository = new PrismaGitLinkRepository(prisma);
+const adrRepository = new PrismaArchitectureDecisionRepository(prisma);
+const specRepository = new PrismaTechnicalSpecificationRepository(prisma);
+const architectureLinkRepository = new PrismaArchitectureLinkRepository(prisma);
 
 const app = buildApp({
   authenticationService: authenticationModule.authenticationService,
@@ -38,6 +44,9 @@ const app = buildApp({
   repositoryRepository,
   commitRepository,
   gitLinkRepository,
+  adrRepository,
+  specRepository,
+  architectureLinkRepository,
 });
 
 async function startServer(): Promise<void> {

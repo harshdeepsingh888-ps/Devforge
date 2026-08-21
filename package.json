@@ -1,26 +1,31 @@
 {
-    "name":  "devforge",
-    "version":  "0.1.0",
-    "private":  true,
-    "description":  "A developer workspace for preserving project context, decisions, progress, and next actions.",
-    "workspaces":  [
-                       "apps/*"
-                   ],
-    "scripts":  {
-                    "dev:api":  "npm run dev --workspace @devforge/api",
-                    "build:api":  "npm run build --workspace @devforge/api",
-                    "typecheck:api":  "npm run typecheck --workspace @devforge/api",
-                    "build":  "npm run build:api",
-                    "typecheck":  "npm run typecheck:api",
-                    "test":  "npm run test --workspace @devforge/api",
-                    "db:up": "npm run db:up --workspace @devforge/api",
-                    "db:down": "npm run db:down --workspace @devforge/api",
-                    "db:migrate": "npm run db:migrate --workspace @devforge/api",
-                    "db:reset": "npm run db:reset --workspace @devforge/api",
-                    "db:generate": "npm run db:generate --workspace @devforge/api",
-                    "db:setup": "npm run db:setup --workspace @devforge/api"
-                },
-    "engines":  {
-                    "node":  "\u003e=24"
-                }
+  "name": "devforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A developer workspace for preserving project context, decisions, progress, and next actions.",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace @devforge/api",
+    "dev:web": "npm run dev --workspace @devforge/web",
+    "build:api": "npm run build --workspace @devforge/api",
+    "build:web": "npm run build --workspace @devforge/web",
+    "typecheck:api": "npm run typecheck --workspace @devforge/api",
+    "typecheck:web": "npm run typecheck --workspace @devforge/web",
+    "test:api": "npm run test --workspace @devforge/api",
+    "test:web": "npm run test --workspace @devforge/web",
+    "build": "npm run build:api && npm run build:web",
+    "typecheck": "npm run typecheck:api && npm run typecheck:web",
+    "test": "npm run test:api && npm run test:web",
+    "db:up": "npm run db:up --workspace @devforge/api",
+    "db:down": "npm run db:down --workspace @devforge/api",
+    "db:migrate": "npm run db:migrate --workspace @devforge/api",
+    "db:reset": "npm run db:reset --workspace @devforge/api",
+    "db:generate": "npm run db:generate --workspace @devforge/api",
+    "db:setup": "npm run db:setup --workspace @devforge/api"
+  },
+  "engines": {
+    "node": ">=24"
+  }
 }

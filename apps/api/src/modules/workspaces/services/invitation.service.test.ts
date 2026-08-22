@@ -31,7 +31,7 @@ async function setupTestContext() {
   );
 
   const ws1 = await workspaceService.createWorkspace({
-    name: "Acme Corp",
+    name: " Corp",
     creatorUserId: "owner-1",
   });
 
@@ -63,7 +63,7 @@ async function setupTestContext() {
 
   // Create users in userRepo
   await userRepo.create({
-    email: "existing-member@acme.com",
+    email: "existing-member@.com",
     passwordHash: "hash",
     displayName: "Existing Member",
   });
@@ -86,18 +86,18 @@ test("createInvitation enforces RBAC and ADMIN -> OWNER escalation restrictions"
   const ownerResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "new-dev@acme.com",
+    email: "new-dev@.com",
     role: "DEVELOPER",
   });
   assert.ok(ownerResult.rawToken);
-  assert.equal(ownerResult.invitation.email, "new-dev@acme.com");
+  assert.equal(ownerResult.invitation.email, "new-dev@.com");
   assert.equal(ownerResult.invitation.role, "DEVELOPER");
 
   // OWNER creates OWNER invitation -> succeeds
   const ownerAppointResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "co-owner@acme.com",
+    email: "co-owner@.com",
     role: "OWNER",
   });
   assert.ok(ownerAppointResult.rawToken);
@@ -106,7 +106,7 @@ test("createInvitation enforces RBAC and ADMIN -> OWNER escalation restrictions"
   const adminResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "admin-1",
-    email: "contractor@acme.com",
+    email: "contractor@.com",
     role: "DEVELOPER",
   });
   assert.ok(adminResult.rawToken);
@@ -117,7 +117,7 @@ test("createInvitation enforces RBAC and ADMIN -> OWNER escalation restrictions"
       await invitationService.createInvitation({
         workspaceId: ws1.id,
         actorUserId: "admin-1",
-        email: "sneaky-owner@acme.com",
+        email: "sneaky-owner@.com",
         role: "OWNER",
       });
     },
@@ -130,7 +130,7 @@ test("createInvitation enforces RBAC and ADMIN -> OWNER escalation restrictions"
       await invitationService.createInvitation({
         workspaceId: ws1.id,
         actorUserId: "dev-1",
-        email: "friend@acme.com",
+        email: "friend@.com",
         role: "DEVELOPER",
       });
     },
@@ -143,7 +143,7 @@ test("createInvitation enforces RBAC and ADMIN -> OWNER escalation restrictions"
       await invitationService.createInvitation({
         workspaceId: ws1.id,
         actorUserId: "viewer-1",
-        email: "friend@acme.com",
+        email: "friend@.com",
         role: "VIEWER",
       });
     },
@@ -155,7 +155,7 @@ test("createInvitation prevents duplicate pending invitations and inviting exist
   const { ws1, invitationService, userRepo, workspaceService } = await setupTestContext();
 
   const user = await userRepo.create({
-    email: "active-member@acme.com",
+    email: "active-member@.com",
     passwordHash: "hash",
     displayName: "Active Member",
   });
@@ -167,13 +167,13 @@ test("createInvitation prevents duplicate pending invitations and inviting exist
     role: "DEVELOPER",
   });
 
-  // Attempting to invite active-member@acme.com -> throws WorkspaceMembershipAlreadyExistsError
+  // Attempting to invite active-member@.com -> throws WorkspaceMembershipAlreadyExistsError
   await assert.rejects(
     async () => {
       await invitationService.createInvitation({
         workspaceId: ws1.id,
         actorUserId: "owner-1",
-        email: "active-member@acme.com",
+        email: "active-member@.com",
         role: "DEVELOPER",
       });
     },
@@ -184,7 +184,7 @@ test("createInvitation prevents duplicate pending invitations and inviting exist
   await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "pending@acme.com",
+    email: "pending@.com",
     role: "DEVELOPER",
   });
 
@@ -194,7 +194,7 @@ test("createInvitation prevents duplicate pending invitations and inviting exist
       await invitationService.createInvitation({
         workspaceId: ws1.id,
         actorUserId: "owner-1",
-        email: "pending@acme.com",
+        email: "pending@.com",
         role: "DEVELOPER",
       });
     },
@@ -208,7 +208,7 @@ test("token security: raw token is never persisted in DB and tokenHash is stored
   const result = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "secure@acme.com",
+    email: "secure@.com",
     role: "DEVELOPER",
   });
 
@@ -235,7 +235,7 @@ test("acceptInvitation transitions invitation to ACCEPTED and grants workspace m
   const createResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "new-hire@acme.com",
+    email: "new-hire@.com",
     role: "DEVELOPER",
   });
 
@@ -267,7 +267,7 @@ test("acceptInvitation rejects expired and revoked tokens", async () => {
   const expiredResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "expired-user@acme.com",
+    email: "expired-user@.com",
     role: "DEVELOPER",
     expiresInDays: -1, // created already expired
   });
@@ -286,7 +286,7 @@ test("acceptInvitation rejects expired and revoked tokens", async () => {
   const revokedResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "revoked-user@acme.com",
+    email: "revoked-user@.com",
     role: "DEVELOPER",
   });
 
@@ -313,7 +313,7 @@ test("revokeInvitation allows OWNER and ADMIN, rejects DEVELOPER/VIEWER and non-
   const inv1 = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "inv1@acme.com",
+    email: "inv1@.com",
     role: "DEVELOPER",
   });
 

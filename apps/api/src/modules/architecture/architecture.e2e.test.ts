@@ -42,7 +42,7 @@ test("Architecture E2E: Full Decision & Spec Lifecycle, Traceability Links & Imm
     method: "POST",
     url: `/api/workspaces/${workspaceId}/projects`,
     headers: { authorization: `Bearer ${token}` },
-    payload: { name: "Core Platform Project" },
+    payload: { name: " Project" },
   });
   assert.equal(projRes.statusCode, 201);
   const projectId = projRes.json().data.id;

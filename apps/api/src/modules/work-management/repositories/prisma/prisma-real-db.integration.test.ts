@@ -140,4 +140,5 @@ test("Real PostgreSQL Database V2 Integration & Persistence Verification", async
   // Cleanup test data
   await prisma.workspace.delete({ where: { id: workspace.id } });
   await prisma.user.delete({ where: { id: user.id } });
+  await prisma.$disconnect();
 });

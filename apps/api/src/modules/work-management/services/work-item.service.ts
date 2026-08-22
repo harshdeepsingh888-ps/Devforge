@@ -58,6 +58,13 @@ export interface AddCommentParams {
   content: string;
 }
 
+export interface DeleteWorkItemParams {
+  workspaceId: string;
+  projectId: string;
+  workItemId: string;
+  actorUserId: string;
+}
+
 export class WorkItemService {
   constructor(
     private readonly workItemRepo: WorkItemRepository,
@@ -111,11 +118,15 @@ export class WorkItemService {
     // Determine workflow
     let workflowId = params.workflowId;
     if (!workflowId) {
-      const defaultWorkflow = await this.workflowRepo.findDefaultWorkflow(
+      let defaultWorkflow = await this.workflowRepo.findDefaultWorkflow(
         params.workspaceId,
       );
       if (!defaultWorkflow) {
-        throw new WorkflowNotFoundError();
+        defaultWorkflow = await this.workflowRepo.createWorkflow({
+          workspaceId: params.workspaceId,
+          name: "Default Workflow",
+          isDefault: true,
+        });
       }
       workflowId = defaultWorkflow.id;
     } else {
@@ -390,5 +401,53 @@ export class WorkItemService {
     }
 
     return comment;
+  }
+
+  async deleteWorkItem(params: DeleteWorkItemParams): Promise<void> {
+    const actorMembership = await this.assertActorWorkspaceMember(
+      params.workspaceId,
+      params.actorUserId,
+    );
+
+    if (actorMembership.role === "VIEWER") {
+      throw new WorkspacePermissionDeniedError(
+        "Action requires DEVELOPER or higher role.",
+      );
+    }
+
+    const project = await this.projectRepo.findById(
+      params.workspaceId,
+      params.projectId,
+    );
+
+    if (!project) {
+      throw new WorkItemTenantMismatchError(
+        "Project not found in this workspace.",
+      );
+    }
+
+    const workItem = await this.workItemRepo.findById(
+      params.workspaceId,
+      params.workItemId,
+    );
+
+    if (!workItem) {
+      throw new WorkItemNotFoundError();
+    }
+
+    if (workItem.projectId !== params.projectId) {
+      throw new WorkItemTenantMismatchError(
+        "Work item belongs to a different project.",
+      );
+    }
+
+    const deleted = await this.workItemRepo.delete(
+      params.workspaceId,
+      params.workItemId,
+    );
+
+    if (!deleted) {
+      throw new WorkItemNotFoundError();
+    }
   }
 }

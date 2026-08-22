@@ -25,6 +25,7 @@ import {
   listCommentsSchema,
   updateCommentSchema,
   deleteCommentSchema,
+  deleteWorkItemSchema,
 } from "./work-management.schemas.js";
 import type {
   WorkItemPriority,
@@ -341,6 +342,44 @@ export const workManagementRoutes: FastifyPluginAsync<
 
         return reply.code(200).send({ data: transitioned });
       } catch (error) {
+        return handleWorkManagementError(error, reply);
+      }
+    },
+  );
+
+  // DELETE WORK ITEM
+  app.delete<{
+    Params: { workspaceId: string; projectId: string; workItemId: string };
+  }>(
+    "/projects/:projectId/work-items/:workItemId",
+    {
+      preHandler: [requireWorkspaceRole("DEVELOPER")],
+      schema: deleteWorkItemSchema,
+    },
+    async (request, reply) => {
+      const actorUserId = request.auth!.userId;
+
+      try {
+        await workItemService.deleteWorkItem({
+          workspaceId: request.params.workspaceId,
+          projectId: request.params.projectId,
+          workItemId: request.params.workItemId,
+          actorUserId,
+        });
+
+        return reply.code(204).send();
+      } catch (error) {
+        request.log.error(
+          {
+            err: error,
+            workspaceId: request.params.workspaceId,
+            projectId: request.params.projectId,
+            workItemId: request.params.workItemId,
+            actorUserId,
+          },
+          "Failed to delete work item",
+        );
+
         return handleWorkManagementError(error, reply);
       }
     },

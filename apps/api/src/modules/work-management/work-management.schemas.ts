@@ -392,3 +392,29 @@ export const deleteCommentSchema = {
     },
   },
 };
+
+export const deleteWorkItemSchema = {
+  tags: ["Work Management"],
+  summary: "Delete a work item",
+  description: "Permanently deletes a work item within a project.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "workspaceId",
+      "projectId",
+      "workItemId",
+    ],
+    properties: {
+      workspaceId: {
+        type: "string",
+      },
+      projectId: {
+        type: "string",
+      },
+      workItemId: {
+        type: "string",
+      },
+    },
+  },
+} as const;

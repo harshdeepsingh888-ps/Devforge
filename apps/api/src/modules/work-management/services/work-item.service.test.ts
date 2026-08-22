@@ -20,7 +20,10 @@ import {
   WorkflowStateDuplicatePositionError,
   DuplicateStateTransitionError,
   WorkItemTitleRequiredError,
+  WorkflowNotFoundError,
+  WorkItemNotFoundError,
 } from "../work-management.errors.js";
+import { WorkspacePermissionDeniedError } from "../../workspaces/workspace.errors.js";
 
 async function setupTestContext() {
   const workspaceRepo = new InMemoryWorkspaceRepository();
@@ -444,3 +447,172 @@ test("Comments & WorkItem History logging", async () => {
   assert.equal(history[0]?.action, "CREATED");
   assert.equal(history[1]?.action, "COMMENTED");
 });
+
+test("Default Workflow Bootstrapping during WorkItem creation", async () => {
+  const { ws1, project1, workItemService, workflowRepo, workspaceService, projectRepo } =
+    await setupTestContext();
+
+  // 1. Existing default workflow: uses existing default, does not create another
+  const workflowsBefore = await workflowRepo.findWorkflowsByWorkspace(ws1.id);
+  assert.equal(workflowsBefore.length, 1);
+
+  const item1 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Task in Workspace with Existing Default Workflow",
+  });
+
+  const workflowsAfter = await workflowRepo.findWorkflowsByWorkspace(ws1.id);
+  assert.equal(workflowsAfter.length, 1);
+  assert.equal(item1.workflowId, workflowsBefore[0]!.id);
+
+  // 2. No default workflow: creates a default workflow (isDefault: true, name: "Default Workflow"),
+  //    work item is created successfully, uses that workflow and its actual initial state
+  const wsNoWf = await workspaceService.createWorkspace({
+    name: "Workspace Without Workflow",
+    creatorUserId: "owner-2",
+  });
+  const projNoWf = await projectRepo.create({
+    workspaceId: wsNoWf.id,
+    name: "Project Without Workflow",
+  });
+
+  const wsNoWfBefore = await workflowRepo.findWorkflowsByWorkspace(wsNoWf.id);
+  assert.equal(wsNoWfBefore.length, 0);
+
+  const itemNoWf = await workItemService.createWorkItem({
+    workspaceId: wsNoWf.id,
+    projectId: projNoWf.id,
+    actorUserId: "owner-2",
+    type: "TASK",
+    title: "First Task in Fresh Workspace",
+  });
+
+  const wsNoWfAfter = await workflowRepo.findWorkflowsByWorkspace(wsNoWf.id);
+  assert.equal(wsNoWfAfter.length, 1);
+  const createdDefaultWf = wsNoWfAfter[0]!;
+  assert.equal(createdDefaultWf.isDefault, true);
+  assert.equal(createdDefaultWf.name, "Default Workflow");
+  assert.equal(itemNoWf.workflowId, createdDefaultWf.id);
+
+  const initialState = await workflowRepo.findInitialState(createdDefaultWf.id);
+  assert.ok(initialState);
+  assert.equal(itemNoWf.workflowStateId, initialState.id);
+
+  // 3. Explicit valid workflowId: still works unchanged
+  const customWf = await workflowRepo.createWorkflow({
+    workspaceId: ws1.id,
+    name: "Custom Workflow",
+  });
+  const customInitialState = await workflowRepo.findInitialState(customWf.id);
+  assert.ok(customInitialState);
+
+  const itemWithExplicitWf = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Task with Explicit Workflow",
+    workflowId: customWf.id,
+  });
+
+  assert.equal(itemWithExplicitWf.workflowId, customWf.id);
+  assert.equal(itemWithExplicitWf.workflowStateId, customInitialState.id);
+
+  // 4. Explicit invalid workflowId: returns WorkflowNotFoundError
+  await assert.rejects(
+    async () => {
+      await workItemService.createWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        actorUserId: "owner-1",
+        type: "TASK",
+        title: "Task with Nonexistent Workflow",
+        workflowId: "invalid-workflow-id",
+      });
+    },
+    WorkflowNotFoundError,
+  );
+});
+
+test("WorkItem Deletion Lifecycle & RBAC", async () => {
+  const { ws1, project1, project2, workItemService, workItemRepo, workspaceService } =
+    await setupTestContext();
+
+  // Create a viewer in ws1
+  await workspaceService.addMember({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    targetUserId: "viewer-1",
+    role: "VIEWER",
+  });
+
+  // Create a work item
+  const task = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Task to be deleted",
+  });
+
+  assert.ok(await workItemRepo.findById(ws1.id, task.id));
+
+  // 1. VIEWER cannot delete work item -> throws WorkspacePermissionDeniedError
+  await assert.rejects(
+    async () => {
+      await workItemService.deleteWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: task.id,
+        actorUserId: "viewer-1",
+      });
+    },
+    WorkspacePermissionDeniedError,
+  );
+
+  // 2. Mismatched project ID -> throws WorkItemTenantMismatchError
+  await assert.rejects(
+    async () => {
+      await workItemService.deleteWorkItem({
+        workspaceId: ws1.id,
+        projectId: project2.id,
+        workItemId: task.id,
+        actorUserId: "owner-1",
+      });
+    },
+    WorkItemTenantMismatchError,
+  );
+
+  // 3. Nonexistent work item -> throws WorkItemNotFoundError
+  await assert.rejects(
+    async () => {
+      await workItemService.deleteWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: "non-existent-id",
+        actorUserId: "owner-1",
+      });
+    },
+    WorkItemNotFoundError,
+  );
+
+  // 4. Authorized role (DEVELOPER or OWNER) can delete work item
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+  });
+
+  // 5. Deleted work item can no longer be retrieved or listed
+  const retrieved = await workItemRepo.findById(ws1.id, task.id);
+  assert.equal(retrieved, null);
+
+  const list = await workItemRepo.findByWorkspace(ws1.id, project1.id);
+  assert.ok(!list.some((item) => item.id === task.id));
+});
+
+

@@ -183,7 +183,7 @@ test("Full SaaS End-to-End Lifecycle: Register -> Auth -> Create Workspace -> Ma
     headers: { authorization: `Bearer ${user1Token}` },
     payload: {
       name: "DevForge API Engine",
-      description: "Backend microservices core platform",
+      description: "Backend microservices ",
     },
   });
 

@@ -81,7 +81,7 @@ test("V2 Work Management REST API End-to-End Lifecycle & Security Verification",
     method: "POST",
     url: `/api/workspaces/${ws1.id}/projects`,
     headers: { authorization: `Bearer ${ownerToken}` },
-    payload: { name: "Core Platform Engine", description: "V2 Backend Architecture" },
+    payload: { name: " Engine", description: "V2 Backend Architecture" },
   });
 
   assert.equal(createProjectRes.statusCode, 201);

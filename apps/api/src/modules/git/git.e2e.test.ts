@@ -50,7 +50,7 @@ test("Git E2E: Repository Creation, Commit Ingestion, Auto-linking & Full Trace 
       authorization: `Bearer ${token}`,
     },
     payload: {
-      name: "Core Platform",
+      name: "Git E2E Project",
     },
   });
   assert.equal(projRes.statusCode, 201);

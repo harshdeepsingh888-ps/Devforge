@@ -1,0 +1,518 @@
+import React, { useEffect, useState } from "react";
+import { api } from "../../api/api";
+import type {
+  Comment,
+  Project,
+  WorkItem,
+  WorkItemHistory,
+  WorkItemPriority,
+  WorkflowDetails,
+  Workspace,
+} from "../../types/api.types";
+
+interface WorkItemInspectorProps {
+  item: WorkItem;
+  workspace: Workspace;
+  project: Project;
+  workflowDetails: WorkflowDetails | null;
+  allItems: WorkItem[];
+  onClose: () => void;
+  onItemUpdated: (updatedItem: WorkItem) => void;
+  onTransitionState: (item: WorkItem, targetStateId: string) => Promise<void>;
+  onDeleteRequest: (item: WorkItem) => void;
+}
+
+const PRIORITY_OPTIONS: {
+  value: WorkItemPriority;
+  label: string;
+  badgeClass: string;
+}[] = [
+  {
+    value: "LOW",
+    label: "Low",
+    badgeClass: "border-slate-600/40 bg-slate-800/30 text-slate-400",
+  },
+  {
+    value: "MEDIUM",
+    label: "Medium",
+    badgeClass: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  },
+  {
+    value: "HIGH",
+    label: "High",
+    badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  },
+  {
+    value: "URGENT",
+    label: "Urgent",
+    badgeClass: "border-rose-500/30 bg-rose-500/10 text-rose-300",
+  },
+];
+
+export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
+  item,
+  workspace,
+  workflowDetails,
+  allItems,
+  onClose,
+  onItemUpdated,
+  onTransitionState,
+  onDeleteRequest,
+}) => {
+  // EDITABLE TITLE & DESCRIPTION STATE
+  const [title, setTitle] = useState(item.title);
+  const [description, setDescription] = useState(item.description || "");
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [isSavingDesc, setIsSavingDesc] = useState(false);
+  const [isSavingPriority, setIsSavingPriority] = useState(false);
+  const [isTransitioningStatus, setIsTransitioningStatus] = useState(false);
+
+  // COMMENTS & HISTORY STATE
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [newCommentContent, setNewCommentContent] = useState("");
+  const [isAddingComment, setIsAddingComment] = useState(false);
+
+  const [history, setHistory] = useState<WorkItemHistory[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<"DETAILS" | "COMMENTS" | "HISTORY">("DETAILS");
+  const [error, setError] = useState<string | null>(null);
+
+  // SYNC PROPS TO LOCAL STATE ON ITEM CHANGE
+  useEffect(() => {
+    setTitle(item.title);
+    setDescription(item.description || "");
+    setError(null);
+  }, [item.id, item.title, item.description]);
+
+  // LISTEN FOR ESCAPE KEY TO CLOSE INSPECTOR
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // LOAD COMMENTS & HISTORY WHEN ITEM CHANGES
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadData() {
+      setIsLoadingComments(true);
+      setIsLoadingHistory(true);
+
+      try {
+        const [cList, hList] = await Promise.allSettled([
+          api.getComments(workspace.id, item.id),
+          api.getWorkItemHistory(workspace.id, item.id),
+        ]);
+
+        if (isMounted) {
+          if (cList.status === "fulfilled") setComments(cList.value);
+          if (hList.status === "fulfilled") setHistory(hList.value);
+        }
+      } catch {
+        // silent fail fallback
+      } finally {
+        if (isMounted) {
+          setIsLoadingComments(false);
+          setIsLoadingHistory(false);
+        }
+      }
+    }
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [workspace.id, item.id]);
+
+  // TITLE SAVE
+  const handleSaveTitle = async () => {
+    const trimmed = title.trim();
+    if (!trimmed || trimmed === item.title || isSavingTitle) return;
+
+    setIsSavingTitle(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(workspace.id, item.id, {
+        title: trimmed,
+      });
+      onItemUpdated(updated);
+    } catch (err) {
+      setTitle(item.title);
+      setError(err instanceof Error ? err.message : "Failed to update title");
+    } finally {
+      setIsSavingTitle(false);
+    }
+  };
+
+  // DESCRIPTION SAVE
+  const handleSaveDescription = async () => {
+    const trimmed = description.trim();
+    const currentDesc = item.description || "";
+    if (trimmed === currentDesc || isSavingDesc) return;
+
+    setIsSavingDesc(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(workspace.id, item.id, {
+        description: trimmed || null,
+      });
+      onItemUpdated(updated);
+    } catch (err) {
+      setDescription(item.description || "");
+      setError(
+        err instanceof Error ? err.message : "Failed to update description",
+      );
+    } finally {
+      setIsSavingDesc(false);
+    }
+  };
+
+  // PRIORITY CHANGE
+  const handlePriorityChange = async (newPriority: WorkItemPriority) => {
+    if (newPriority === item.priority || isSavingPriority) return;
+
+    setIsSavingPriority(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(workspace.id, item.id, {
+        priority: newPriority,
+      });
+      onItemUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update priority",
+      );
+    } finally {
+      setIsSavingPriority(false);
+    }
+  };
+
+  // STATUS TRANSITION
+  const handleStatusChange = async (targetStateId: string) => {
+    if (targetStateId === item.workflowStateId || isTransitioningStatus) return;
+
+    setIsTransitioningStatus(true);
+    setError(null);
+
+    try {
+      await onTransitionState(item, targetStateId);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to transition state",
+      );
+    } finally {
+      setIsTransitioningStatus(false);
+    }
+  };
+
+  // ADD COMMENT
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const content = newCommentContent.trim();
+    if (!content || isAddingComment) return;
+
+    setIsAddingComment(true);
+    try {
+      const created = await api.addComment(workspace.id, item.id, content);
+      setComments((prev) => [...prev, created]);
+      setNewCommentContent("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add comment");
+    } finally {
+      setIsAddingComment(false);
+    }
+  };
+
+  // RESOLVE WORKFLOW STATES & TRANSITIONS
+  const currentStateObj = workflowDetails?.states.find(
+    (s) => s.id === item.workflowStateId,
+  );
+
+  const allowedTransitions = workflowDetails
+    ? workflowDetails.transitions.filter(
+        (t) => t.fromStateId === item.workflowStateId,
+      )
+    : [];
+
+  const allowedTargetStates = workflowDetails
+    ? workflowDetails.states.filter((s) =>
+        allowedTransitions.some((t) => t.toStateId === s.id),
+      )
+    : [];
+
+  const parentItem = item.parentId
+    ? allItems.find((i) => i.id === item.parentId)
+    : null;
+
+  return (
+    <aside className="flex h-full w-full flex-col border-l border-[#161a18] bg-[#080a09] font-mono text-xs text-[#e5e7eb] select-none">
+      {/* HEADER BAR */}
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#161a18] px-4">
+        <div className="flex items-center gap-2">
+          <span className="rounded border border-[#202622] bg-[#0b0f0d] px-1.5 py-0.5 text-[10px] font-bold text-[#9ca3af]">
+            {item.type || "TASK"}
+          </span>
+
+          <span className="text-[10px] text-[#6b7280]">
+            INSPECTOR
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded p-1 text-base text-[#9ca3af] hover:bg-[#161a18] hover:text-white"
+          title="Close Inspector (Esc)"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* ERROR NOTIFICATION */}
+      {error && (
+        <div className="m-3 rounded border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-300">
+          {error}
+        </div>
+      )}
+
+      {/* CONTENT SCROLL AREA */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        {/* TITLE FIELD */}
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7280]">
+            Title
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleSaveTitle}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSaveTitle();
+            }}
+            disabled={isSavingTitle}
+            className="w-full rounded border border-transparent bg-transparent font-sans text-sm font-semibold text-white outline-none transition hover:border-[#202622] focus:border-emerald-500 focus:bg-[#050706] focus:px-2 focus:py-1"
+          />
+        </div>
+
+        {/* DESCRIPTION FIELD */}
+        <div>
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7280]">
+            Description
+          </label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onBlur={handleSaveDescription}
+            placeholder="No description provided. Click to add details..."
+            disabled={isSavingDesc}
+            className="w-full rounded border border-[#202622] bg-[#050706] p-2.5 font-sans text-xs text-[#e5e7eb] placeholder:text-[#525d6b] outline-none transition focus:border-emerald-500"
+          />
+        </div>
+
+        {/* METADATA GRID / TABLE */}
+        <div className="border-t border-[#161a18] pt-4 space-y-3">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[#6b7280]">
+            Properties
+          </div>
+
+          {/* STATUS ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">STATUS</span>
+            {allowedTargetStates.length > 0 ? (
+              <select
+                value={item.workflowStateId || ""}
+                disabled={isTransitioningStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+              >
+                <option value={item.workflowStateId || ""} disabled>
+                  {currentStateObj ? currentStateObj.name : "Select status"}
+                </option>
+                {allowedTargetStates.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    &rarr; {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="rounded border border-[#202622] bg-[#0b0f0d] px-2 py-0.5 text-xs text-white">
+                {currentStateObj ? currentStateObj.name : "Unknown"}
+              </span>
+            )}
+          </div>
+
+          {/* PRIORITY ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">PRIORITY</span>
+            <select
+              value={item.priority || "MEDIUM"}
+              disabled={isSavingPriority}
+              onChange={(e) =>
+                handlePriorityChange(e.target.value as WorkItemPriority)
+              }
+              className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+            >
+              {PRIORITY_OPTIONS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* TYPE ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">TYPE</span>
+            <span className="text-xs text-white">{item.type || "TASK"}</span>
+          </div>
+
+          {/* ASSIGNEE ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">ASSIGNEE</span>
+            <span className="text-xs text-[#6b7280]">
+              {item.assigneeUserId ? "Assigned" : "Not assigned"}
+            </span>
+          </div>
+
+          {/* TEAM ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">TEAM</span>
+            <span className="text-xs text-[#6b7280]">
+              {item.teamId ? "Assigned" : "Not assigned"}
+            </span>
+          </div>
+
+          {/* PARENT ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">PARENT</span>
+            <span className="truncate max-w-[180px] text-xs text-white">
+              {parentItem ? parentItem.title : "Not linked"}
+            </span>
+          </div>
+
+          {/* STORY POINTS ROW */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">STORY POINTS</span>
+            <span className="text-xs text-[#6b7280]">
+              {item.storyPoints != null ? `${item.storyPoints} pts` : "Not estimated"}
+            </span>
+          </div>
+        </div>
+
+        {/* TABS: DETAILS / COMMENTS / HISTORY */}
+        <div className="border-t border-[#161a18] pt-4">
+          <div className="flex items-center gap-4 border-b border-[#161a18] pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab("DETAILS")}
+              className={`text-[11px] font-bold ${
+                activeTab === "DETAILS" ? "text-emerald-400" : "text-[#6b7280]"
+              }`}
+            >
+              Activity & Comments
+            </button>
+          </div>
+
+          <div className="mt-3 space-y-4">
+            {/* COMMENTS SECTION */}
+            <div>
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#6b7280] mb-2">
+                Comments ({comments.length})
+              </span>
+
+              {isLoadingComments ? (
+                <p className="text-[11px] text-[#6b7280]">Loading comments...</p>
+              ) : comments.length === 0 ? (
+                <p className="text-[11px] text-[#6b7280]">No comments yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {comments.map((c) => (
+                    <div
+                      key={c.id}
+                      className="rounded border border-[#202622] bg-[#050706] p-2.5 font-sans"
+                    >
+                      <p className="text-xs text-[#e5e7eb]">{c.content}</p>
+                      <span className="mt-1 block font-mono text-[9px] text-[#6b7280]">
+                        {new Date(c.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ADD COMMENT FORM */}
+              <form onSubmit={handleAddComment} className="mt-3 space-y-2">
+                <input
+                  type="text"
+                  value={newCommentContent}
+                  onChange={(e) => setNewCommentContent(e.target.value)}
+                  placeholder="Write a comment..."
+                  disabled={isAddingComment}
+                  className="w-full rounded border border-[#202622] bg-[#050706] px-2.5 py-1.5 font-sans text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isAddingComment || !newCommentContent.trim()}
+                    className="rounded bg-emerald-500 px-3 py-1 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
+                  >
+                    {isAddingComment ? "Posting..." : "Comment"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* HISTORY LOG SECTION */}
+            <div className="border-t border-[#161a18] pt-3">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#6b7280] mb-2">
+                History Log ({history.length})
+              </span>
+
+              {isLoadingHistory ? (
+                <p className="text-[11px] text-[#6b7280]">Loading history...</p>
+              ) : history.length === 0 ? (
+                <p className="text-[11px] text-[#6b7280]">No history recorded.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {history.map((h) => (
+                    <div
+                      key={h.id}
+                      className="flex items-center justify-between text-[10px] text-[#9ca3af] py-0.5 border-b border-[#161a18] last:border-b-0"
+                    >
+                      <span className="font-semibold text-white">{h.action}</span>
+                      <span>{new Date(h.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DANGER ZONE / DELETE BUTTON */}
+      <div className="border-t border-[#161a18] p-3">
+        <button
+          type="button"
+          onClick={() => onDeleteRequest(item)}
+          className="w-full rounded border border-rose-500/40 bg-rose-500/10 py-1.5 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
+        >
+          Delete Work Item
+        </button>
+      </div>
+    </aside>
+  );
+};

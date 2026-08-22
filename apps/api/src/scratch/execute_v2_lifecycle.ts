@@ -52,7 +52,7 @@ async function runLifecycle() {
   const projRes = await fetch(`${BASE_URL}/api/workspaces/${workspaceId}/projects`, {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ name: "Core Platform" }),
+    body: JSON.stringify({ name: "" }),
   });
   const projData = await projRes.json() as any;
   const projectId = projData.data?.id;

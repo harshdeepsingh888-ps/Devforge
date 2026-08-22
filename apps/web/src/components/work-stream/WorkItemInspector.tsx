@@ -52,6 +52,7 @@ const PRIORITY_OPTIONS: {
 export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   item,
   workspace,
+  project,
   workflowDetails,
   allItems,
   onClose,
@@ -59,12 +60,17 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   onTransitionState,
   onDeleteRequest,
 }) => {
-  // EDITABLE TITLE & DESCRIPTION STATE
+  // EDITABLE STATE
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description || "");
+  const [storyPointsStr, setStoryPointsStr] = useState(
+    item.storyPoints != null ? String(item.storyPoints) : "",
+  );
+
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isSavingDesc, setIsSavingDesc] = useState(false);
   const [isSavingPriority, setIsSavingPriority] = useState(false);
+  const [isSavingStoryPoints, setIsSavingStoryPoints] = useState(false);
   const [isTransitioningStatus, setIsTransitioningStatus] = useState(false);
 
   // COMMENTS & HISTORY STATE
@@ -83,8 +89,9 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   useEffect(() => {
     setTitle(item.title);
     setDescription(item.description || "");
+    setStoryPointsStr(item.storyPoints != null ? String(item.storyPoints) : "");
     setError(null);
-  }, [item.id, item.title, item.description]);
+  }, [item.id, item.title, item.description, item.storyPoints]);
 
   // LISTEN FOR ESCAPE KEY TO CLOSE INSPECTOR
   useEffect(() => {
@@ -141,9 +148,12 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     setError(null);
 
     try {
-      const updated = await api.updateWorkItem(workspace.id, item.id, {
-        title: trimmed,
-      });
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { title: trimmed },
+        project.id,
+      );
       onItemUpdated(updated);
     } catch (err) {
       setTitle(item.title);
@@ -163,9 +173,12 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     setError(null);
 
     try {
-      const updated = await api.updateWorkItem(workspace.id, item.id, {
-        description: trimmed || null,
-      });
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { description: trimmed || null },
+        project.id,
+      );
       onItemUpdated(updated);
     } catch (err) {
       setDescription(item.description || "");
@@ -185,9 +198,12 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     setError(null);
 
     try {
-      const updated = await api.updateWorkItem(workspace.id, item.id, {
-        priority: newPriority,
-      });
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { priority: newPriority },
+        project.id,
+      );
       onItemUpdated(updated);
     } catch (err) {
       setError(
@@ -195,6 +211,40 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
       );
     } finally {
       setIsSavingPriority(false);
+    }
+  };
+
+  // STORY POINTS SAVE
+  const handleSaveStoryPoints = async () => {
+    const trimmed = storyPointsStr.trim();
+    const parsed = trimmed === "" ? null : Number(trimmed);
+
+    if (isNaN(parsed as number)) {
+      setError("Story points must be a valid number");
+      setStoryPointsStr(item.storyPoints != null ? String(item.storyPoints) : "");
+      return;
+    }
+
+    if (parsed === item.storyPoints || isSavingStoryPoints) return;
+
+    setIsSavingStoryPoints(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { storyPoints: parsed },
+        project.id,
+      );
+      onItemUpdated(updated);
+    } catch (err) {
+      setStoryPointsStr(item.storyPoints != null ? String(item.storyPoints) : "");
+      setError(
+        err instanceof Error ? err.message : "Failed to update story points",
+      );
+    } finally {
+      setIsSavingStoryPoints(false);
     }
   };
 
@@ -379,7 +429,26 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             <span className="text-xs text-white">{item.type || "TASK"}</span>
           </div>
 
-          {/* ASSIGNEE ROW */}
+          {/* STORY POINTS ROW (EDITABLE) */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-[11px] text-[#9ca3af]">STORY POINTS</span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={storyPointsStr}
+              placeholder="Unestimated"
+              disabled={isSavingStoryPoints}
+              onChange={(e) => setStoryPointsStr(e.target.value)}
+              onBlur={handleSaveStoryPoints}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveStoryPoints();
+              }}
+              className="w-24 rounded border border-[#202622] bg-[#050706] px-2 py-0.5 text-right text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* ASSIGNEE ROW (READ-ONLY TRUTHFUL GAP REPORTING) */}
           <div className="flex items-center justify-between py-1">
             <span className="text-[11px] text-[#9ca3af]">ASSIGNEE</span>
             <span className="text-xs text-[#6b7280]">
@@ -387,7 +456,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             </span>
           </div>
 
-          {/* TEAM ROW */}
+          {/* TEAM ROW (READ-ONLY TRUTHFUL GAP REPORTING) */}
           <div className="flex items-center justify-between py-1">
             <span className="text-[11px] text-[#9ca3af]">TEAM</span>
             <span className="text-xs text-[#6b7280]">
@@ -402,17 +471,9 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               {parentItem ? parentItem.title : "Not linked"}
             </span>
           </div>
-
-          {/* STORY POINTS ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">STORY POINTS</span>
-            <span className="text-xs text-[#6b7280]">
-              {item.storyPoints != null ? `${item.storyPoints} pts` : "Not estimated"}
-            </span>
-          </div>
         </div>
 
-        {/* TABS: DETAILS / COMMENTS / HISTORY */}
+        {/* COMMENTS & HISTORY */}
         <div className="border-t border-[#161a18] pt-4">
           <div className="flex items-center gap-4 border-b border-[#161a18] pb-2">
             <button

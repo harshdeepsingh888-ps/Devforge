@@ -615,4 +615,100 @@ test("WorkItem Deletion Lifecycle & RBAC", async () => {
   assert.ok(!list.some((item) => item.id === task.id));
 });
 
+test("WorkItem Update & Property Editing RBAC & Tenant Safety", async () => {
+  const { ws1, ws2, project1, project2, workItemService, workItemRepo, workspaceService } =
+    await setupTestContext();
+
+  await workspaceService.addMember({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    targetUserId: "viewer-1",
+    role: "VIEWER",
+  });
+
+  const task = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Initial Title",
+    description: "Initial Description",
+    priority: "MEDIUM",
+  });
+
+  // 1. VIEWER cannot update work item -> WorkspacePermissionDeniedError
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        workItemId: task.id,
+        actorUserId: "viewer-1",
+        title: "Hacked Title",
+      });
+    },
+    WorkspacePermissionDeniedError,
+  );
+
+  // 2. DEVELOPER can update allowed properties (title, description, priority, storyPoints)
+  const updated = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+    title: "Updated Title",
+    description: "Updated Description",
+    priority: "URGENT",
+    storyPoints: 8,
+  });
+
+  assert.equal(updated.title, "Updated Title");
+  assert.equal(updated.description, "Updated Description");
+  assert.equal(updated.priority, "URGENT");
+  assert.equal(updated.storyPoints, 8);
+
+  // 3. Mismatched project ID -> throws WorkItemTenantMismatchError
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project2.id,
+        workItemId: task.id,
+        actorUserId: "owner-1",
+        title: "Wrong Project Title",
+      });
+    },
+    WorkItemTenantMismatchError,
+  );
+
+  // 4. Invalid assignee user (not workspace member) -> throws WorkItemTenantMismatchError
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        workItemId: task.id,
+        actorUserId: "owner-1",
+        assigneeUserId: "non-member-user-id",
+      });
+    },
+    WorkItemTenantMismatchError,
+  );
+
+  // 5. Empty title -> throws WorkItemTitleRequiredError
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        workItemId: task.id,
+        actorUserId: "owner-1",
+        title: "   ",
+      });
+    },
+    WorkItemTitleRequiredError,
+  );
+
+  // 6. Generic update endpoint does NOT touch workflowStateId (preserves workflow state)
+  const afterUpdate = await workItemRepo.findById(ws1.id, task.id);
+  assert.equal(afterUpdate?.workflowStateId, task.workflowStateId);
+});
+
 

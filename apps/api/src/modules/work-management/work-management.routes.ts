@@ -225,31 +225,62 @@ export const workManagementRoutes: FastifyPluginAsync<
       schema: updateWorkItemSchema,
     },
     async (request, reply) => {
+      const actorUserId = request.auth!.userId;
       try {
-        const { workspaceId, workItemId } = request.params;
-        const existing = await workItemRepository.findById(workspaceId, workItemId);
-        if (!existing) {
-          throw new WorkItemNotFoundError();
-        }
+        const updated = await workItemService.updateWorkItem({
+          workspaceId: request.params.workspaceId,
+          workItemId: request.params.workItemId,
+          actorUserId,
+          title: request.body.title,
+          description: request.body.description,
+          priority: request.body.priority,
+          storyPoints: request.body.storyPoints,
+          assigneeUserId: request.body.assigneeUserId,
+          teamId: request.body.teamId,
+          parentId: request.body.parentId,
+        });
 
-        const updates: Partial<typeof existing> = {};
-        if (request.body.title !== undefined) updates.title = request.body.title;
-        if (request.body.description !== undefined)
-          updates.description = request.body.description;
-        if (request.body.priority !== undefined)
-          updates.priority = request.body.priority;
-        if (request.body.storyPoints !== undefined)
-          updates.storyPoints = request.body.storyPoints;
-        if (request.body.assigneeUserId !== undefined)
-          updates.assigneeUserId = request.body.assigneeUserId;
-        if (request.body.teamId !== undefined) updates.teamId = request.body.teamId;
-        if (request.body.parentId !== undefined) updates.parentId = request.body.parentId;
+        return reply.code(200).send({ data: updated });
+      } catch (error) {
+        return handleWorkManagementError(error, reply);
+      }
+    },
+  );
 
-        const updated = await workItemRepository.update(
-          workspaceId,
-          workItemId,
-          updates,
-        );
+  // UPDATE WORK ITEM (WITH PROJECT ID)
+  app.patch<{
+    Params: { workspaceId: string; projectId: string; workItemId: string };
+    Body: {
+      title?: string;
+      description?: string | null;
+      priority?: WorkItemPriority;
+      storyPoints?: number | null;
+      assigneeUserId?: string | null;
+      teamId?: string | null;
+      parentId?: string | null;
+    };
+  }>(
+    "/projects/:projectId/work-items/:workItemId",
+    {
+      preHandler: [requireWorkspaceRole("DEVELOPER")],
+      schema: updateWorkItemSchema,
+    },
+    async (request, reply) => {
+      const actorUserId = request.auth!.userId;
+      try {
+        const updated = await workItemService.updateWorkItem({
+          workspaceId: request.params.workspaceId,
+          projectId: request.params.projectId,
+          workItemId: request.params.workItemId,
+          actorUserId,
+          title: request.body.title,
+          description: request.body.description,
+          priority: request.body.priority,
+          storyPoints: request.body.storyPoints,
+          assigneeUserId: request.body.assigneeUserId,
+          teamId: request.body.teamId,
+          parentId: request.body.parentId,
+        });
 
         return reply.code(200).send({ data: updated });
       } catch (error) {

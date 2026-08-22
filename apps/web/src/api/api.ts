@@ -216,14 +216,16 @@ export const api = {
     workspaceId: string,
     workItemId: string,
     updates: UpdateWorkItemInput,
+    projectId?: string,
   ): Promise<WorkItem> {
-    return apiFetch<WorkItem>(
-      `/api/workspaces/${workspaceId}/work-items/${workItemId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      },
-    );
+    const url = projectId
+      ? `/api/workspaces/${workspaceId}/projects/${projectId}/work-items/${workItemId}`
+      : `/api/workspaces/${workspaceId}/work-items/${workItemId}`;
+
+    return apiFetch<WorkItem>(url, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
   },
 
   async getComments(

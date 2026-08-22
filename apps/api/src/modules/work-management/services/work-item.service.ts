@@ -65,6 +65,20 @@ export interface DeleteWorkItemParams {
   actorUserId: string;
 }
 
+export interface UpdateWorkItemParams {
+  workspaceId: string;
+  projectId?: string | undefined;
+  workItemId: string;
+  actorUserId: string;
+  title?: string | undefined;
+  description?: string | null | undefined;
+  priority?: WorkItemPriority | undefined;
+  storyPoints?: number | null | undefined;
+  assigneeUserId?: string | null | undefined;
+  teamId?: string | null | undefined;
+  parentId?: string | null | undefined;
+}
+
 export class WorkItemService {
   constructor(
     private readonly workItemRepo: WorkItemRepository,
@@ -449,5 +463,98 @@ export class WorkItemService {
     if (!deleted) {
       throw new WorkItemNotFoundError();
     }
+  }
+
+  async updateWorkItem(params: UpdateWorkItemParams): Promise<WorkItem> {
+    const actorMembership = await this.assertActorWorkspaceMember(
+      params.workspaceId,
+      params.actorUserId,
+    );
+
+    if (actorMembership.role === "VIEWER") {
+      throw new WorkspacePermissionDeniedError(
+        "Action requires DEVELOPER or higher role.",
+      );
+    }
+
+    const existing = await this.workItemRepo.findById(
+      params.workspaceId,
+      params.workItemId,
+    );
+
+    if (!existing) {
+      throw new WorkItemNotFoundError();
+    }
+
+    if (params.projectId && existing.projectId !== params.projectId) {
+      throw new WorkItemTenantMismatchError(
+        "Work item belongs to a different project.",
+      );
+    }
+
+    if (params.title !== undefined) {
+      if (!params.title || params.title.trim().length === 0) {
+        throw new WorkItemTitleRequiredError();
+      }
+    }
+
+    if (params.assigneeUserId) {
+      const assigneeMembership = await this.workspaceRepo.findMembership(
+        params.workspaceId,
+        params.assigneeUserId,
+      );
+      if (!assigneeMembership) {
+        throw new WorkItemTenantMismatchError(
+          "Assignee user is not an active member of this workspace.",
+        );
+      }
+    }
+
+    if (params.teamId && this.teamRepo) {
+      const team = await this.teamRepo.findById(params.workspaceId, params.teamId);
+      if (!team) {
+        throw new WorkItemTenantMismatchError("Team not found in this workspace.");
+      }
+    }
+
+    if (params.parentId) {
+      await this.validateParentHierarchy({
+        workspaceId: params.workspaceId,
+        projectId: existing.projectId,
+        childType: existing.type,
+        parentId: params.parentId,
+        childId: existing.id,
+      });
+    }
+
+    const updates: Partial<typeof existing> = {};
+    if (params.title !== undefined) updates.title = params.title.trim();
+    if (params.description !== undefined) updates.description = params.description;
+    if (params.priority !== undefined) updates.priority = params.priority;
+    if (params.storyPoints !== undefined) updates.storyPoints = params.storyPoints;
+    if (params.assigneeUserId !== undefined) updates.assigneeUserId = params.assigneeUserId;
+    if (params.teamId !== undefined) updates.teamId = params.teamId;
+    if (params.parentId !== undefined) updates.parentId = params.parentId;
+
+    const updated = await this.workItemRepo.update(
+      params.workspaceId,
+      params.workItemId,
+      updates,
+    );
+
+    if (!updated) {
+      throw new WorkItemNotFoundError();
+    }
+
+    if (this.historyRepo) {
+      await this.historyRepo.create({
+        workspaceId: params.workspaceId,
+        workItemId: updated.id,
+        actorUserId: params.actorUserId,
+        action: "UPDATED",
+      });
+    }
+
+    return updated;
   }
 }

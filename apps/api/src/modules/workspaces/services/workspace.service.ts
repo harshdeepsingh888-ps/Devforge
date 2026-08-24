@@ -134,4 +134,20 @@ export class WorkspaceService {
       role: params.role,
     });
   }
+
+  async listWorkspaceMembers(
+    workspaceId: string,
+    actorUserId: string,
+  ): Promise<import("../workspace.types.js").WorkspaceMemberWithUser[]> {
+    const membership = await this.repository.findMembership(
+      workspaceId,
+      actorUserId,
+    );
+
+    if (!membership) {
+      throw new WorkspaceNotFoundError();
+    }
+
+    return this.repository.listMemberships(workspaceId);
+  }
 }

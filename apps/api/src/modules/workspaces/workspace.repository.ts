@@ -43,4 +43,8 @@ export interface WorkspaceRepository {
     userId: string,
     role: WorkspaceRole,
   ): Promise<WorkspaceMember | null>;
+
+  listMemberships(
+    workspaceId: string,
+  ): Promise<import("./workspace.types.js").WorkspaceMemberWithUser[]>;
 }

@@ -9,11 +9,13 @@ import { WorkItemInspector } from "../components/work-stream/WorkItemInspector";
 
 import type {
   Project,
+  Team,
   WorkItem,
   WorkItemPriority,
   WorkflowDetails,
   WorkflowState,
   Workspace,
+  WorkspaceMember,
 } from "../types/api.types";
 
 interface WorkStreamProps {
@@ -86,6 +88,33 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
   const [projection, setProjection] = useState<"BOARD" | "LIST">(
     "BOARD",
   );
+
+  // WORKSPACE MEMBERS & TEAMS STATE
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+
+  // LOAD WORKSPACE-LEVEL MEMBERS & TEAMS ONCE PER WORKSPACE
+  useEffect(() => {
+    let isMounted = true;
+    async function loadWorkspaceData() {
+      try {
+        const [membersData, teamsData] = await Promise.all([
+          api.getWorkspaceMembers(workspace.id),
+          api.getTeams(workspace.id),
+        ]);
+        if (isMounted) {
+          setMembers(membersData);
+          setTeams(teamsData);
+        }
+      } catch (err) {
+        console.error("Failed to load workspace members/teams:", err);
+      }
+    }
+    void loadWorkspaceData();
+    return () => {
+      isMounted = false;
+    };
+  }, [workspace.id]);
 
   // SELECTED WORK ITEM INSPECTOR STATE
   const [selectedWorkItemId, setSelectedWorkItemId] = useState<string | null>(
@@ -329,6 +358,13 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
     return workflowDetails.states.filter((state) =>
       validTargetIds.has(state.id),
     );
+  };
+
+  const handleTeamCreated = (newTeam: Team) => {
+    setTeams((current) => {
+      if (current.some((t) => t.id === newTeam.id)) return current;
+      return [...current, newTeam];
+    });
   };
 
   const selectedItem = items.find((i) => i.id === selectedWorkItemId);
@@ -864,6 +900,8 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
               project={project}
               workflowDetails={workflowDetails}
               allItems={items}
+              members={members}
+              teams={teams}
               onClose={() => setSelectedWorkItemId(null)}
               onItemUpdated={handleItemUpdated}
               onTransitionState={handleTransitionState}
@@ -871,6 +909,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                 setDeleteError(null);
                 setItemToDelete(item);
               }}
+              onTeamCreated={handleTeamCreated}
             />
           </div>
 
@@ -889,6 +928,8 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                 project={project}
                 workflowDetails={workflowDetails}
                 allItems={items}
+                members={members}
+                teams={teams}
                 onClose={() => setSelectedWorkItemId(null)}
                 onItemUpdated={handleItemUpdated}
                 onTransitionState={handleTransitionState}
@@ -896,6 +937,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                   setDeleteError(null);
                   setItemToDelete(item);
                 }}
+                onTeamCreated={handleTeamCreated}
               />
             </div>
           </div>

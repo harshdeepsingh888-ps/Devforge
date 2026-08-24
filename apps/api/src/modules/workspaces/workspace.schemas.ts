@@ -146,3 +146,138 @@ export const addWorkspaceMemberSchema = {
     404: workspaceNotFoundSchema,
   },
 } as const;
+
+export const listWorkspaceMembersSchema = {
+  tags: ["Workspaces"],
+  summary: "List workspace members",
+  description: "Returns all active members of the workspace with user public details.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId"],
+    properties: {
+      workspaceId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      additionalProperties: false,
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["workspaceId", "userId", "role", "joinedAt", "user"],
+            properties: {
+              workspaceId: { type: "string" },
+              userId: { type: "string" },
+              role: { type: "string", enum: [...WORKSPACE_ROLES] },
+              joinedAt: { type: "string" },
+              user: {
+                type: "object",
+                additionalProperties: false,
+                required: ["id", "displayName", "email"],
+                properties: {
+                  id: { type: "string" },
+                  displayName: { type: "string" },
+                  email: { type: "string" },
+                  avatarUrl: { type: ["string", "null"] },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    404: workspaceNotFoundSchema,
+  },
+} as const;
+
+export const listWorkspaceTeamsSchema = {
+  tags: ["Workspaces"],
+  summary: "List workspace teams",
+  description: "Returns all teams belonging to the workspace.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId"],
+    properties: {
+      workspaceId: { type: "string" },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      additionalProperties: false,
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["id", "workspaceId", "name", "slug", "createdAt", "updatedAt"],
+            properties: {
+              id: { type: "string" },
+              workspaceId: { type: "string" },
+              name: { type: "string" },
+              slug: { type: "string" },
+              createdAt: { type: "string" },
+              updatedAt: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    404: workspaceNotFoundSchema,
+  },
+} as const;
+
+export const createTeamSchema = {
+  tags: ["Workspaces"],
+  summary: "Create a workspace team",
+  description: "Creates a new team in the workspace (OWNER or ADMIN).",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId"],
+    properties: {
+      workspaceId: { type: "string" },
+    },
+  },
+  body: {
+    type: "object",
+    additionalProperties: false,
+    required: ["name"],
+    properties: {
+      name: { type: "string", minLength: 1, maxLength: 100 },
+      slug: { type: "string", minLength: 1, maxLength: 100 },
+    },
+  },
+  response: {
+    201: {
+      type: "object",
+      additionalProperties: false,
+      required: ["data"],
+      properties: {
+        data: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "workspaceId", "name", "slug", "createdAt", "updatedAt"],
+          properties: {
+            id: { type: "string" },
+            workspaceId: { type: "string" },
+            name: { type: "string" },
+            slug: { type: "string" },
+            createdAt: { type: "string" },
+            updatedAt: { type: "string" },
+          },
+        },
+      },
+    },
+    404: workspaceNotFoundSchema,
+  },
+} as const;

@@ -27,6 +27,7 @@ import { WorkspaceService } from "./modules/workspaces/services/workspace.servic
 import { workspaceRoutes } from "./modules/workspaces/routes/workspace.routes.js";
 import { InMemoryTeamRepository } from "./modules/workspaces/repositories/memory/in-memory-team.repository.js";
 import type { TeamRepository } from "./modules/workspaces/repositories/team.repository.js";
+import { TeamService } from "./modules/workspaces/services/team.service.js";
 import { InMemoryWorkflowRepository } from "./modules/work-management/repositories/memory/in-memory-workflow.repository.js";
 import type { WorkflowRepository } from "./modules/work-management/repositories/workflow.repository.js";
 import { InMemoryWorkItemRepository } from "./modules/work-management/repositories/memory/in-memory-work-item.repository.js";
@@ -101,6 +102,7 @@ export interface BuildAppOptions {
   workspaceRepository?: WorkspaceRepository;
   workspaceService?: WorkspaceService;
   teamRepository?: TeamRepository;
+  teamService?: TeamService;
   workflowRepository?: WorkflowRepository;
   workItemRepository?: WorkItemRepository;
   commentRepository?: CommentRepository;
@@ -168,6 +170,10 @@ export function buildApp(
 
   const teamRepository =
     options.teamRepository ?? new InMemoryTeamRepository();
+
+  const teamService =
+    options.teamService ??
+    new TeamService(teamRepository, workspaceRepository);
 
   const workflowRepository =
     options.workflowRepository ?? new InMemoryWorkflowRepository();
@@ -445,6 +451,7 @@ export function buildApp(
         {
           prefix: "/api/workspaces",
           service: workspaceService,
+          teamService,
         },
       );
 

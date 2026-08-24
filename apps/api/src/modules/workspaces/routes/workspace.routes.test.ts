@@ -190,3 +190,112 @@ test("POST /api/workspaces/:workspaceId/members adds a member when caller is OWN
   assert.equal(body.data.userId, "new-member-1");
   assert.equal(body.data.role, "DEVELOPER");
 });
+
+test("GET /api/workspaces/:workspaceId/members returns members with public user details", async (t) => {
+  const repository = new InMemoryWorkspaceRepository();
+  const service = new WorkspaceService(repository);
+
+  repository.setUser({
+    id: "owner-1",
+    displayName: "Alice Owner",
+    email: "alice@example.com",
+    avatarUrl: null,
+  });
+
+  const app = buildApp({
+    serverOptions: { logger: false },
+    workspaceRepository: repository,
+    workspaceService: service,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const ws = await service.createWorkspace({ name: "Members Org", creatorUserId: "owner-1" });
+  const authHeader = await getAuthHeader("owner-1");
+
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${ws.id}/members`,
+    headers: authHeader,
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json();
+  assert.equal(body.data.length, 1);
+  assert.equal(body.data[0].userId, "owner-1");
+  assert.equal(body.data[0].user.displayName, "Alice Owner");
+  assert.equal(body.data[0].user.email, "alice@example.com");
+  assert.equal(body.data[0].user.passwordHash, undefined);
+});
+
+test("GET /api/workspaces/:workspaceId/members returns 404 for non-members", async (t) => {
+  const repository = new InMemoryWorkspaceRepository();
+  const service = new WorkspaceService(repository);
+
+  const app = buildApp({
+    serverOptions: { logger: false },
+    workspaceRepository: repository,
+    workspaceService: service,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const ws = await service.createWorkspace({ name: "Private Org", creatorUserId: "owner-1" });
+  const authHeader = await getAuthHeader("outsider-1");
+
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${ws.id}/members`,
+    headers: authHeader,
+  });
+
+  assert.equal(response.statusCode, 404);
+});
+
+test("POST and GET /api/workspaces/:workspaceId/teams creates and lists teams within workspace", async (t) => {
+  const repository = new InMemoryWorkspaceRepository();
+  const service = new WorkspaceService(repository);
+  const teamRepo = new (await import("../repositories/memory/in-memory-team.repository.js")).InMemoryTeamRepository();
+  const teamService = new (await import("../services/team.service.js")).TeamService(teamRepo, repository);
+
+  const app = buildApp({
+    serverOptions: { logger: false },
+    workspaceRepository: repository,
+    workspaceService: service,
+    teamRepository: teamRepo,
+    teamService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const ws = await service.createWorkspace({ name: "Team Test Org", creatorUserId: "owner-1" });
+  const authHeader = await getAuthHeader("owner-1");
+
+  // Create team
+  const createRes = await app.inject({
+    method: "POST",
+    url: `/api/workspaces/${ws.id}/teams`,
+    headers: authHeader,
+    payload: { name: "Core Engine" },
+  });
+
+  assert.equal(createRes.statusCode, 201);
+  assert.equal(createRes.json().data.name, "Core Engine");
+
+  // List teams
+  const listRes = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${ws.id}/teams`,
+    headers: authHeader,
+  });
+
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.json().data.length, 1);
+  assert.equal(listRes.json().data[0].name, "Core Engine");
+});

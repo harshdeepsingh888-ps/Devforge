@@ -49,6 +49,17 @@ export interface WorkspaceMember {
   joinedAt: string;
 }
 
+export interface WorkspaceMemberUser {
+  id: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null | undefined;
+}
+
+export interface WorkspaceMemberWithUser extends WorkspaceMember {
+  user: WorkspaceMemberUser;
+}
+
 export interface WorkspaceWithMembership
   extends Workspace {
   membership: WorkspaceMember;

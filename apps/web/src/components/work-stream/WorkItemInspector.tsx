@@ -3,11 +3,13 @@ import { api } from "../../api/api";
 import type {
   Comment,
   Project,
+  Team,
   WorkItem,
   WorkItemHistory,
   WorkItemPriority,
   WorkflowDetails,
   Workspace,
+  WorkspaceMember,
 } from "../../types/api.types";
 
 interface WorkItemInspectorProps {
@@ -16,10 +18,13 @@ interface WorkItemInspectorProps {
   project: Project;
   workflowDetails: WorkflowDetails | null;
   allItems: WorkItem[];
+  members?: WorkspaceMember[];
+  teams?: Team[];
   onClose: () => void;
   onItemUpdated: (updatedItem: WorkItem) => void;
   onTransitionState: (item: WorkItem, targetStateId: string) => Promise<void>;
   onDeleteRequest: (item: WorkItem) => void;
+  onTeamCreated?: (team: Team) => void;
 }
 
 const PRIORITY_OPTIONS: {
@@ -55,10 +60,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   project,
   workflowDetails,
   allItems,
+  members = [],
+  teams = [],
   onClose,
   onItemUpdated,
   onTransitionState,
   onDeleteRequest,
+  onTeamCreated,
 }) => {
   // EDITABLE STATE
   const [title, setTitle] = useState(item.title);
@@ -71,7 +79,15 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   const [isSavingDesc, setIsSavingDesc] = useState(false);
   const [isSavingPriority, setIsSavingPriority] = useState(false);
   const [isSavingStoryPoints, setIsSavingStoryPoints] = useState(false);
+  const [isSavingAssignee, setIsSavingAssignee] = useState(false);
+  const [isSavingTeam, setIsSavingTeam] = useState(false);
   const [isTransitioningStatus, setIsTransitioningStatus] = useState(false);
+
+  // INLINE TEAM CREATION STATE
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
 
   // COMMENTS & HISTORY STATE
   const [comments, setComments] = useState<Comment[]>([]);
@@ -85,24 +101,36 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   const [activeTab, setActiveTab] = useState<"DETAILS" | "COMMENTS" | "HISTORY">("DETAILS");
   const [error, setError] = useState<string | null>(null);
 
+  const role = workspace.membership?.role;
+  const isViewer = role === "VIEWER";
+  const canCreateTeam = role === "OWNER" || role === "ADMIN";
+
   // SYNC PROPS TO LOCAL STATE ON ITEM CHANGE
   useEffect(() => {
     setTitle(item.title);
     setDescription(item.description || "");
     setStoryPointsStr(item.storyPoints != null ? String(item.storyPoints) : "");
     setError(null);
+    setIsCreatingTeam(false);
+    setNewTeamName("");
+    setTeamError(null);
   }, [item.id, item.title, item.description, item.storyPoints]);
 
   // LISTEN FOR ESCAPE KEY TO CLOSE INSPECTOR
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        if (isCreatingTeam) {
+          setIsCreatingTeam(false);
+          setTeamError(null);
+        } else {
+          onClose();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, isCreatingTeam]);
 
   // LOAD COMMENTS & HISTORY WHEN ITEM CHANGES
   useEffect(() => {
@@ -142,7 +170,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   // TITLE SAVE
   const handleSaveTitle = async () => {
     const trimmed = title.trim();
-    if (!trimmed || trimmed === item.title || isSavingTitle) return;
+    if (!trimmed || trimmed === item.title || isSavingTitle || isViewer) return;
 
     setIsSavingTitle(true);
     setError(null);
@@ -167,7 +195,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   const handleSaveDescription = async () => {
     const trimmed = description.trim();
     const currentDesc = item.description || "";
-    if (trimmed === currentDesc || isSavingDesc) return;
+    if (trimmed === currentDesc || isSavingDesc || isViewer) return;
 
     setIsSavingDesc(true);
     setError(null);
@@ -192,7 +220,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
   // PRIORITY CHANGE
   const handlePriorityChange = async (newPriority: WorkItemPriority) => {
-    if (newPriority === item.priority || isSavingPriority) return;
+    if (newPriority === item.priority || isSavingPriority || isViewer) return;
 
     setIsSavingPriority(true);
     setError(null);
@@ -216,6 +244,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
   // STORY POINTS SAVE
   const handleSaveStoryPoints = async () => {
+    if (isViewer) return;
     const trimmed = storyPointsStr.trim();
     const parsed = trimmed === "" ? null : Number(trimmed);
 
@@ -248,9 +277,101 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     }
   };
 
+  // ASSIGNEE CHANGE
+  const handleAssigneeChange = async (newUserId: string | null) => {
+    if (newUserId === item.assigneeUserId || isSavingAssignee || isViewer) return;
+
+    setIsSavingAssignee(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { assigneeUserId: newUserId },
+        project.id,
+      );
+      onItemUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not update assignee.",
+      );
+    } finally {
+      setIsSavingAssignee(false);
+    }
+  };
+
+  // TEAM CHANGE
+  const handleTeamChange = async (newTeamId: string | null) => {
+    if (newTeamId === item.teamId || isSavingTeam || isViewer) return;
+
+    setIsSavingTeam(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { teamId: newTeamId },
+        project.id,
+      );
+      onItemUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not update team.",
+      );
+    } finally {
+      setIsSavingTeam(false);
+    }
+  };
+
+  // CREATE TEAM SUBMIT & AUTO-ASSIGNMENT (STEP 5 & STEP 6)
+  const handleCreateTeamSubmit = async () => {
+    const trimmedName = newTeamName.trim();
+    if (!trimmedName || isSubmittingTeam || !canCreateTeam) return;
+
+    setIsSubmittingTeam(true);
+    setTeamError(null);
+    setError(null);
+
+    let createdTeam: Team | null = null;
+
+    try {
+      createdTeam = await api.createTeam(workspace.id, trimmedName);
+      if (onTeamCreated) {
+        onTeamCreated(createdTeam);
+      }
+      setIsCreatingTeam(false);
+      setNewTeamName("");
+    } catch (err) {
+      setTeamError(
+        err instanceof Error ? err.message : "Could not create team.",
+      );
+      setIsSubmittingTeam(false);
+      return;
+    }
+
+    setIsSubmittingTeam(false);
+
+    // Auto-assign newly created team to the selected work item
+    if (createdTeam) {
+      try {
+        const updated = await api.updateWorkItem(
+          workspace.id,
+          item.id,
+          { teamId: createdTeam.id },
+          project.id,
+        );
+        onItemUpdated(updated);
+      } catch (err) {
+        setError("Team created, but could not assign it to this work item.");
+      }
+    }
+  };
+
   // STATUS TRANSITION
   const handleStatusChange = async (targetStateId: string) => {
-    if (targetStateId === item.workflowStateId || isTransitioningStatus) return;
+    if (targetStateId === item.workflowStateId || isTransitioningStatus || isViewer) return;
 
     setIsTransitioningStatus(true);
     setError(null);
@@ -270,7 +391,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = newCommentContent.trim();
-    if (!content || isAddingComment) return;
+    if (!content || isAddingComment || isViewer) return;
 
     setIsAddingComment(true);
     try {
@@ -351,8 +472,8 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSaveTitle();
             }}
-            disabled={isSavingTitle}
-            className="w-full rounded border border-transparent bg-transparent font-sans text-sm font-semibold text-white outline-none transition hover:border-[#202622] focus:border-emerald-500 focus:bg-[#050706] focus:px-2 focus:py-1"
+            disabled={isSavingTitle || isViewer}
+            className="w-full rounded border border-transparent bg-transparent font-sans text-sm font-semibold text-white outline-none transition hover:border-[#202622] focus:border-emerald-500 focus:bg-[#050706] focus:px-2 focus:py-1 disabled:opacity-60"
           />
         </div>
 
@@ -367,8 +488,8 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             onChange={(e) => setDescription(e.target.value)}
             onBlur={handleSaveDescription}
             placeholder="No description provided. Click to add details..."
-            disabled={isSavingDesc}
-            className="w-full rounded border border-[#202622] bg-[#050706] p-2.5 font-sans text-xs text-[#e5e7eb] placeholder:text-[#525d6b] outline-none transition focus:border-emerald-500"
+            disabled={isSavingDesc || isViewer}
+            className="w-full rounded border border-[#202622] bg-[#050706] p-2.5 font-sans text-xs text-[#e5e7eb] placeholder:text-[#525d6b] outline-none transition focus:border-emerald-500 disabled:opacity-60"
           />
         </div>
 
@@ -381,7 +502,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           {/* STATUS ROW */}
           <div className="flex items-center justify-between py-1">
             <span className="text-[11px] text-[#9ca3af]">STATUS</span>
-            {allowedTargetStates.length > 0 ? (
+            {allowedTargetStates.length > 0 && !isViewer ? (
               <select
                 value={item.workflowStateId || ""}
                 disabled={isTransitioningStatus}
@@ -409,11 +530,11 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             <span className="text-[11px] text-[#9ca3af]">PRIORITY</span>
             <select
               value={item.priority || "MEDIUM"}
-              disabled={isSavingPriority}
+              disabled={isSavingPriority || isViewer}
               onChange={(e) =>
                 handlePriorityChange(e.target.value as WorkItemPriority)
               }
-              className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+              className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
             >
               {PRIORITY_OPTIONS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -438,30 +559,154 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               step={1}
               value={storyPointsStr}
               placeholder="Unestimated"
-              disabled={isSavingStoryPoints}
+              disabled={isSavingStoryPoints || isViewer}
               onChange={(e) => setStoryPointsStr(e.target.value)}
               onBlur={handleSaveStoryPoints}
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSaveStoryPoints();
               }}
-              className="w-24 rounded border border-[#202622] bg-[#050706] px-2 py-0.5 text-right text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500"
+              className="w-24 rounded border border-[#202622] bg-[#050706] px-2 py-0.5 text-right text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60"
             />
           </div>
 
-          {/* ASSIGNEE ROW (READ-ONLY TRUTHFUL GAP REPORTING) */}
+          {/* ASSIGNEE ROW */}
           <div className="flex items-center justify-between py-1">
             <span className="text-[11px] text-[#9ca3af]">ASSIGNEE</span>
-            <span className="text-xs text-[#6b7280]">
-              {item.assigneeUserId ? "Assigned" : "Not assigned"}
-            </span>
+            <select
+              value={item.assigneeUserId || ""}
+              disabled={isSavingAssignee || isViewer}
+              onChange={(e) =>
+                handleAssigneeChange(e.target.value ? e.target.value : null)
+              }
+              className="max-w-[180px] truncate rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+            >
+              <option value="">Unassigned</option>
+              {members.map((m) => (
+                <option key={m.userId} value={m.userId}>
+                  {m.user?.displayName || m.user?.email || m.userId}
+                </option>
+              ))}
+              {item.assigneeUserId &&
+                !members.some((m) => m.userId === item.assigneeUserId) && (
+                  <option value={item.assigneeUserId} disabled>
+                    Unknown member
+                  </option>
+                )}
+            </select>
           </div>
 
-          {/* TEAM ROW (READ-ONLY TRUTHFUL GAP REPORTING) */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">TEAM</span>
-            <span className="text-xs text-[#6b7280]">
-              {item.teamId ? "Assigned" : "Not assigned"}
-            </span>
+          {/* TEAM ROW (ZERO-TEAM & MULTI-TEAM CREATION UX) */}
+          <div className="flex flex-col py-1 gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-[#9ca3af]">TEAM</span>
+              {teams.length === 0 ? (
+                !isCreatingTeam ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#6b7280]">No teams yet</span>
+                    {canCreateTeam && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewTeamName("");
+                          setTeamError(null);
+                          setIsCreatingTeam(true);
+                        }}
+                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition"
+                      >
+                        + Create team
+                      </button>
+                    )}
+                  </div>
+                ) : null
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={item.teamId || ""}
+                    disabled={isSavingTeam || isViewer}
+                    onChange={(e) =>
+                      handleTeamChange(e.target.value ? e.target.value : null)
+                    }
+                    className="max-w-[150px] truncate rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                  >
+                    <option value="">No team</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                    {item.teamId &&
+                      !teams.some((t) => t.id === item.teamId) && (
+                        <option value={item.teamId} disabled>
+                          Unknown team
+                        </option>
+                      )}
+                  </select>
+
+                  {canCreateTeam && !isCreatingTeam && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewTeamName("");
+                        setTeamError(null);
+                        setIsCreatingTeam(true);
+                      }}
+                      className="rounded border border-[#202622] bg-[#050706] px-1.5 py-1 text-[11px] font-bold text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition"
+                      title="Create new team"
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* INLINE TEAM CREATION FORM */}
+            {isCreatingTeam && (
+              <div className="mt-1 space-y-1.5 rounded border border-[#202622] bg-[#050706] p-2">
+                <input
+                  type="text"
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleCreateTeamSubmit();
+                    } else if (e.key === "Escape") {
+                      setIsCreatingTeam(false);
+                      setTeamError(null);
+                    }
+                  }}
+                  placeholder="Team name..."
+                  disabled={isSubmittingTeam}
+                  autoFocus
+                  className="w-full rounded border border-[#202622] bg-[#080a09] px-2 py-1 text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60 font-sans"
+                />
+                {teamError && (
+                  <p className="text-[10px] font-medium text-red-400">{teamError}</p>
+                )}
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingTeam(false);
+                      setTeamError(null);
+                    }}
+                    disabled={isSubmittingTeam}
+                    className="rounded px-2 py-0.5 text-[10px] text-[#9ca3af] hover:text-white disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateTeamSubmit()}
+                    disabled={isSubmittingTeam || !newTeamName.trim()}
+                    className="rounded bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
+                  >
+                    {isSubmittingTeam ? "Creating..." : "Create"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* PARENT ROW */}
@@ -521,13 +766,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   value={newCommentContent}
                   onChange={(e) => setNewCommentContent(e.target.value)}
                   placeholder="Write a comment..."
-                  disabled={isAddingComment}
-                  className="w-full rounded border border-[#202622] bg-[#050706] px-2.5 py-1.5 font-sans text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500"
+                  disabled={isAddingComment || isViewer}
+                  className="w-full rounded border border-[#202622] bg-[#050706] px-2.5 py-1.5 font-sans text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60"
                 />
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    disabled={isAddingComment || !newCommentContent.trim()}
+                    disabled={isAddingComment || !newCommentContent.trim() || isViewer}
                     className="rounded bg-emerald-500 px-3 py-1 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
                   >
                     {isAddingComment ? "Posting..." : "Comment"}
@@ -565,15 +810,17 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
       </div>
 
       {/* DANGER ZONE / DELETE BUTTON */}
-      <div className="border-t border-[#161a18] p-3">
-        <button
-          type="button"
-          onClick={() => onDeleteRequest(item)}
-          className="w-full rounded border border-rose-500/40 bg-rose-500/10 py-1.5 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
-        >
-          Delete Work Item
-        </button>
-      </div>
+      {!isViewer && (
+        <div className="border-t border-[#161a18] p-3">
+          <button
+            type="button"
+            onClick={() => onDeleteRequest(item)}
+            className="w-full rounded border border-rose-500/40 bg-rose-500/10 py-1.5 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
+          >
+            Delete Work Item
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

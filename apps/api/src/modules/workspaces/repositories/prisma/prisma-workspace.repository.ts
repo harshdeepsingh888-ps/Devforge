@@ -230,4 +230,36 @@ export class PrismaWorkspaceRepository
       updated,
     );
   }
+
+  async listMemberships(
+    workspaceId: string,
+  ): Promise<import("../../workspace.types.js").WorkspaceMemberWithUser[]> {
+    const memberships = await (this.database as any).workspaceMember.findMany({
+      where: {
+        workspaceId,
+      },
+      include: {
+        user: true,
+      },
+      orderBy: {
+        joinedAt: "asc",
+      },
+    });
+
+    return memberships.map((m: any) => ({
+      workspaceId: m.workspaceId,
+      userId: m.userId,
+      role: m.role,
+      joinedAt:
+        m.joinedAt instanceof Date
+          ? m.joinedAt.toISOString()
+          : m.joinedAt,
+      user: {
+        id: m.user.id,
+        displayName: m.user.displayName,
+        email: m.user.email,
+        avatarUrl: m.user.avatarUrl ?? null,
+      },
+    }));
+  }
 }

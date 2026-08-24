@@ -5,6 +5,36 @@ export interface Workspace {
   name: string;
   slug?: string;
   ownerId?: string;
+  membership?: {
+    workspaceId: string;
+    userId: string;
+    role: "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER";
+    joinedAt: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkspaceMemberUser {
+  id: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
+export interface WorkspaceMember {
+  workspaceId: string;
+  userId: string;
+  role: "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER";
+  joinedAt: string;
+  user: WorkspaceMemberUser;
+}
+
+export interface Team {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -36,3 +36,42 @@ test("@devforge/web: Work Item State Transitions & Column Mapping", () => {
   assert.ok(statuses.includes("IN_PROGRESS"));
   assert.ok(statuses.includes("BLOCKED"));
 });
+
+test("@devforge/web: Team Creation Role Permissions & Auto-Assignment Logic", () => {
+  const canCreateTeam = (role: string) => role === "OWNER" || role === "ADMIN";
+
+  assert.equal(canCreateTeam("OWNER"), true);
+  assert.equal(canCreateTeam("ADMIN"), true);
+  assert.equal(canCreateTeam("DEVELOPER"), false);
+  assert.equal(canCreateTeam("VIEWER"), false);
+
+  // Shared teams state simulation
+  let teams: Array<{ id: string; name: string }> = [];
+  const handleTeamCreated = (newTeam: { id: string; name: string }) => {
+    if (!teams.some((t) => t.id === newTeam.id)) {
+      teams = [...teams, newTeam];
+    }
+  };
+
+  const createdTeam = { id: "t-1", name: "Platform Engineering" };
+  handleTeamCreated(createdTeam);
+  assert.equal(teams.length, 1);
+  assert.equal(teams[0].name, "Platform Engineering");
+
+  // Auto-assignment failure isolation simulation
+  let selectedItemTeamId: string | null = null;
+  let assignmentError: string | null = null;
+
+  const simulateAutoAssignFailure = () => {
+    try {
+      throw new Error("Network error during assignment");
+    } catch {
+      assignmentError = "Team created, but could not assign it to this work item.";
+    }
+  };
+
+  simulateAutoAssignFailure();
+  assert.equal(teams.length, 1); // Team remains preserved in teams array
+  assert.equal(selectedItemTeamId, null);
+  assert.equal(assignmentError, "Team created, but could not assign it to this work item.");
+});

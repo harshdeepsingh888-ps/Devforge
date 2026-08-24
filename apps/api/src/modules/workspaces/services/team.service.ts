@@ -156,4 +156,18 @@ export class TeamService {
 
     return this.teamRepository.findTeamsForUser(params.workspaceId, params.targetUserId);
   }
+
+  async listWorkspaceTeams(params: {
+    workspaceId: string;
+    actorUserId: string;
+  }): Promise<Team[]> {
+    await this.assertActorRole(params.workspaceId, params.actorUserId, [
+      "OWNER",
+      "ADMIN",
+      "DEVELOPER",
+      "VIEWER",
+    ]);
+
+    return this.teamRepository.findAllByWorkspaceId(params.workspaceId);
+  }
 }

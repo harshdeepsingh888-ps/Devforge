@@ -127,17 +127,33 @@ export class InMemoryWorkspaceRepository
     );
   }
 
+  private readonly userMap = new Map<string, import("../../workspace.types.js").WorkspaceMemberUser>();
+
+  setUser(user: import("../../workspace.types.js").WorkspaceMemberUser): void {
+    this.userMap.set(user.id, user);
+  }
+
   async listMemberships(
     workspaceId: string,
-  ): Promise<WorkspaceMember[]> {
-    const results: WorkspaceMember[] = [];
+  ): Promise<import("../../workspace.types.js").WorkspaceMemberWithUser[]> {
+    const results: import("../../workspace.types.js").WorkspaceMemberWithUser[] = [];
 
     for (const membership of this.memberships.values()) {
       if (
         membership.workspaceId ===
         workspaceId
       ) {
-        results.push(membership);
+        const user = this.userMap.get(membership.userId) ?? {
+          id: membership.userId,
+          displayName: membership.userId,
+          email: `${membership.userId}@devforge.local`,
+          avatarUrl: null,
+        };
+
+        results.push({
+          ...membership,
+          user,
+        });
       }
     }
 

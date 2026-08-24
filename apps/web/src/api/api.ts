@@ -6,6 +6,7 @@ import {
 import type {
   Comment,
   Project,
+  Team,
   UpdateWorkItemInput,
   WorkItem,
   WorkItemHistory,
@@ -13,6 +14,7 @@ import type {
   Workflow,
   WorkflowDetails,
   Workspace,
+  WorkspaceMember,
 } from "../types/api.types";
 
 export interface AuthUser {
@@ -258,5 +260,20 @@ export const api = {
     return apiFetch<WorkItemHistory[]>(
       `/api/workspaces/${workspaceId}/work-items/${workItemId}/history`,
     );
+  },
+
+  async getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+    return apiFetch<WorkspaceMember[]>(`/api/workspaces/${workspaceId}/members`);
+  },
+
+  async getTeams(workspaceId: string): Promise<Team[]> {
+    return apiFetch<Team[]>(`/api/workspaces/${workspaceId}/teams`);
+  },
+
+  async createTeam(workspaceId: string, name: string): Promise<Team> {
+    return apiFetch<Team>(`/api/workspaces/${workspaceId}/teams`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
   },
 };

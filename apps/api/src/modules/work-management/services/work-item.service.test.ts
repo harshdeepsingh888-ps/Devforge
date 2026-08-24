@@ -711,4 +711,84 @@ test("WorkItem Update & Property Editing RBAC & Tenant Safety", async () => {
   assert.equal(afterUpdate?.workflowStateId, task.workflowStateId);
 });
 
+test("WorkItem Assignment & Team Updates", async () => {
+  const { ws1, ws2, project1, workItemService, teamRepo, workspaceService } = await setupTestContext();
+
+  await workspaceService.addMember({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    targetUserId: "member-2",
+    role: "DEVELOPER",
+  });
+
+  const team1 = await teamRepo.create({
+    workspaceId: ws1.id,
+    name: "Backend Team",
+    slug: "backend-team",
+  });
+
+  const team2 = await teamRepo.create({
+    workspaceId: ws2.id,
+    name: "Other Workspace Team",
+    slug: "other-workspace-team",
+  });
+
+  const task = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Assignment Task",
+  });
+
+  // 1. Assign valid workspace member
+  const assigned = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "owner-1",
+    assigneeUserId: "member-2",
+  });
+  assert.equal(assigned.assigneeUserId, "member-2");
+
+  // 2. Clear assignee with null
+  const unassigned = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "owner-1",
+    assigneeUserId: null,
+  });
+  assert.equal(unassigned.assigneeUserId, null);
+
+  // 3. Assign valid same-workspace team
+  const teamAssigned = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "owner-1",
+    teamId: team1.id,
+  });
+  assert.equal(teamAssigned.teamId, team1.id);
+
+  // 4. Reject cross-workspace team
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        workItemId: task.id,
+        actorUserId: "owner-1",
+        teamId: team2.id,
+      });
+    },
+    WorkItemTenantMismatchError,
+  );
+
+  // 5. Clear team with null
+  const teamCleared = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "owner-1",
+    teamId: null,
+  });
+  assert.equal(teamCleared.teamId, null);
+});
+
 

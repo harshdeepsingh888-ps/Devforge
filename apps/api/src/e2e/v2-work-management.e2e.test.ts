@@ -255,4 +255,56 @@ test("V2 Work Management REST API End-to-End Lifecycle & Security Verification",
   });
 
   assert.equal(crossTenantPathRes.statusCode, 404);
+
+  // 15. Deletion Guard: Attempting to delete work item with children is rejected (400 WORK_ITEM_HAS_CHILDREN)
+  const deleteWithChildrenRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${ws1.id}/projects/${project1.id}/work-items/${feature.id}`,
+    headers: { authorization: `Bearer ${devToken}` },
+  });
+
+  assert.equal(deleteWithChildrenRes.statusCode, 400);
+  assert.equal(deleteWithChildrenRes.json().error, "WORK_ITEM_HAS_CHILDREN");
+
+  // 16. Hierarchy Rule: FEATURE cannot be unparented (400 WORK_ITEM_HIERARCHY_INVALID)
+  const unparentFeatureRes = await app.inject({
+    method: "PATCH",
+    url: `/api/workspaces/${ws1.id}/work-items/${feature.id}`,
+    headers: { authorization: `Bearer ${devToken}` },
+    payload: { parentId: null },
+  });
+
+  assert.equal(unparentFeatureRes.statusCode, 400);
+  assert.equal(unparentFeatureRes.json().error, "WORK_ITEM_HIERARCHY_INVALID");
+
+  // 17. Hierarchy Rule: Self-parenting rejected (400 WORK_ITEM_HIERARCHY_CYCLE)
+  const selfParentRes = await app.inject({
+    method: "PATCH",
+    url: `/api/workspaces/${ws1.id}/work-items/${task.id}`,
+    headers: { authorization: `Bearer ${devToken}` },
+    payload: { parentId: task.id },
+  });
+
+  assert.equal(selfParentRes.statusCode, 400);
+  assert.equal(selfParentRes.json().error, "WORK_ITEM_HIERARCHY_CYCLE");
+
+  // 18. Legal Unparenting: TASK can be unparented (200 OK)
+  const unparentTaskRes = await app.inject({
+    method: "PATCH",
+    url: `/api/workspaces/${ws1.id}/work-items/${task.id}`,
+    headers: { authorization: `Bearer ${devToken}` },
+    payload: { parentId: null },
+  });
+
+  assert.equal(unparentTaskRes.statusCode, 200);
+  assert.equal(unparentTaskRes.json().data.parentId, null);
+
+  // 19. Deletion Guard: Deleting childless feature succeeds (204 No Content)
+  const deleteFeatureRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${ws1.id}/projects/${project1.id}/work-items/${feature.id}`,
+    headers: { authorization: `Bearer ${devToken}` },
+  });
+
+  assert.equal(deleteFeatureRes.statusCode, 204);
 });

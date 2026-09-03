@@ -4,6 +4,7 @@ import {
   WorkItemTypeInvalidError,
   WorkItemHierarchyInvalidError,
   WorkItemHierarchyCycleError,
+  WorkItemHasChildrenError,
   WorkItemTenantMismatchError,
   InvalidStateTransitionError,
   WorkflowNotFoundError,
@@ -53,6 +54,7 @@ export function handleWorkManagementError(error: unknown, reply: FastifyReply) {
     error instanceof WorkItemTypeInvalidError ||
     error instanceof WorkItemHierarchyInvalidError ||
     error instanceof WorkItemHierarchyCycleError ||
+    error instanceof WorkItemHasChildrenError ||
     error instanceof WorkItemTenantMismatchError ||
     error instanceof InvalidStateTransitionError ||
     error instanceof WorkflowMultipleInitialStatesError ||

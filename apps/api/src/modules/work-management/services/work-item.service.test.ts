@@ -14,6 +14,7 @@ import { WorkItemService } from "./work-item.service.js";
 import {
   WorkItemHierarchyInvalidError,
   WorkItemHierarchyCycleError,
+  WorkItemHasChildrenError,
   WorkItemTenantMismatchError,
   InvalidStateTransitionError,
   WorkflowMultipleInitialStatesError,
@@ -789,6 +790,330 @@ test("WorkItem Assignment & Team Updates", async () => {
     teamId: null,
   });
   assert.equal(teamCleared.teamId, null);
+});
+
+test("WorkItem Hierarchy Hardening: Reparenting, Unparenting, Cycles, and Delete Guards", async () => {
+  const { ws1, ws2, project1, project2, workItemService } = await setupTestContext();
+
+  // Setup initial hierarchy in Project 1:
+  // Epic 1 -> Feature 1 -> Task 1, Bug 1
+  const epic1 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "EPIC",
+    title: "Epic 1",
+  });
+
+  const epic2 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "EPIC",
+    title: "Epic 2",
+  });
+
+  const feature1 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "FEATURE",
+    title: "Feature 1",
+    parentId: epic1.id,
+  });
+
+  const task1 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Task 1",
+    parentId: feature1.id,
+  });
+
+  const bug1 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "BUG",
+    title: "Bug 1",
+    parentId: feature1.id,
+  });
+
+  // 1. FEATURE cannot be unparented (parentId: null rejected)
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: feature1.id,
+        actorUserId: "owner-1",
+        parentId: null,
+      });
+    },
+    WorkItemHierarchyInvalidError,
+  );
+
+  // 2. TASK / BUG legal unparenting
+  const unparentedTask = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task1.id,
+    actorUserId: "owner-1",
+    parentId: null,
+  });
+  assert.equal(unparentedTask.parentId, null);
+
+  const unparentedBug = await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: bug1.id,
+    actorUserId: "owner-1",
+    parentId: null,
+  });
+  assert.equal(unparentedBug.parentId, null);
+
+  // Re-parent task and bug back to feature1 for subsequent tests
+  await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task1.id,
+    actorUserId: "owner-1",
+    parentId: feature1.id,
+  });
+  await workItemService.updateWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: bug1.id,
+    actorUserId: "owner-1",
+    parentId: feature1.id,
+  });
+
+  // 3. Self-parent rejection (childId === parentId)
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: task1.id,
+        actorUserId: "owner-1",
+        parentId: task1.id,
+      });
+    },
+    WorkItemHierarchyCycleError,
+  );
+
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: feature1.id,
+        actorUserId: "owner-1",
+        parentId: feature1.id,
+      });
+    },
+    WorkItemHierarchyCycleError,
+  );
+
+  // 4. Indirect cycle rejection
+  // Attempting to set epic1's parent to feature1 or task1 must reject with cycle error
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: epic1.id,
+        actorUserId: "owner-1",
+        parentId: feature1.id,
+      });
+    },
+    WorkItemHierarchyCycleError,
+  );
+
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: feature1.id,
+        actorUserId: "owner-1",
+        parentId: task1.id,
+      });
+    },
+    WorkItemHierarchyCycleError,
+  );
+
+  // 5. Cross-project parent rejection on update
+  const p2Epic = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project2.id,
+    actorUserId: "owner-1",
+    type: "EPIC",
+    title: "Project 2 Epic",
+  });
+
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: task1.id,
+        actorUserId: "owner-1",
+        parentId: p2Epic.id,
+      });
+    },
+    WorkItemTenantMismatchError,
+  );
+
+  // 6. Invalid parent type
+  // TASK cannot be parent of another TASK
+  const task2 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "TASK",
+    title: "Task 2",
+    parentId: epic1.id,
+  });
+
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: task1.id,
+        actorUserId: "owner-1",
+        parentId: task2.id,
+      });
+    },
+    WorkItemHierarchyInvalidError,
+  );
+
+  // BUG cannot be parent of another BUG or TASK
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: task1.id,
+        actorUserId: "owner-1",
+        parentId: bug1.id,
+      });
+    },
+    WorkItemHierarchyInvalidError,
+  );
+
+  // FEATURE parent must be EPIC, not another FEATURE
+  const feature2 = await workItemService.createWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    actorUserId: "owner-1",
+    type: "FEATURE",
+    title: "Feature 2",
+    parentId: epic1.id,
+  });
+
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: feature2.id,
+        actorUserId: "owner-1",
+        parentId: feature1.id,
+      });
+    },
+    WorkItemHierarchyInvalidError,
+  );
+
+  // EPIC cannot have any parent
+  await assert.rejects(
+    async () => {
+      await workItemService.updateWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: epic2.id,
+        actorUserId: "owner-1",
+        parentId: epic1.id,
+      });
+    },
+    WorkItemHierarchyInvalidError,
+  );
+
+  // 7. Deleting item with children is rejected (Strict deletion guard)
+  // feature1 has task1 and bug1 as children
+  await assert.rejects(
+    async () => {
+      await workItemService.deleteWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: feature1.id,
+        actorUserId: "owner-1",
+      });
+    },
+    WorkItemHasChildrenError,
+  );
+
+  // epic1 has feature1 and feature2 and task2 as children
+  await assert.rejects(
+    async () => {
+      await workItemService.deleteWorkItem({
+        workspaceId: ws1.id,
+        projectId: project1.id,
+        workItemId: epic1.id,
+        actorUserId: "owner-1",
+      });
+    },
+    WorkItemHasChildrenError,
+  );
+
+  // 8. Deleting childless item still works
+  // task1 is a leaf child -> deleting succeeds
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task1.id,
+    actorUserId: "owner-1",
+  });
+
+  // bug1 is a leaf child -> deleting succeeds
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: bug1.id,
+    actorUserId: "owner-1",
+  });
+
+  // Now feature1 has no children left -> deleting feature1 succeeds
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: feature1.id,
+    actorUserId: "owner-1",
+  });
+
+  // Delete remaining children of epic1 (feature2, task2)
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: feature2.id,
+    actorUserId: "owner-1",
+  });
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: task2.id,
+    actorUserId: "owner-1",
+  });
+
+  // Now epic1 has no children left -> deleting epic1 succeeds
+  await workItemService.deleteWorkItem({
+    workspaceId: ws1.id,
+    projectId: project1.id,
+    workItemId: epic1.id,
+    actorUserId: "owner-1",
+  });
 });
 
 

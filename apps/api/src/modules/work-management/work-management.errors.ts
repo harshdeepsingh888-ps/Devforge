@@ -34,6 +34,17 @@ export class WorkItemHierarchyCycleError extends Error {
   }
 }
 
+export class WorkItemHasChildrenError extends Error {
+  readonly code = "WORK_ITEM_HAS_CHILDREN";
+
+  constructor(
+    message = "Cannot delete work item because it has child work items. Reassign or delete child items first.",
+  ) {
+    super(message);
+    this.name = "WorkItemHasChildrenError";
+  }
+}
+
 export class WorkItemTenantMismatchError extends Error {
   readonly code = "WORK_ITEM_TENANT_MISMATCH";
 

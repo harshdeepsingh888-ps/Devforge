@@ -17,6 +17,7 @@ import {
   WorkItemTypeInvalidError,
   WorkItemHierarchyInvalidError,
   WorkItemHierarchyCycleError,
+  WorkItemHasChildrenError,
   WorkItemTenantMismatchError,
   InvalidStateTransitionError,
   WorkItemNotFoundError,
@@ -243,6 +244,20 @@ export class WorkItemService {
       throw new WorkItemTenantMismatchError("Parent work item belongs to a different project.");
     }
 
+    // Cycle Prevention Check (Self-parenting & Indirect cycle)
+    if (params.childId) {
+      if (params.parentId === params.childId) {
+        throw new WorkItemHierarchyCycleError();
+      }
+      const ancestors = await this.workItemRepo.findAncestors(
+        params.workspaceId,
+        params.parentId,
+      );
+      if (ancestors.some((ancestor) => ancestor.id === params.childId)) {
+        throw new WorkItemHierarchyCycleError();
+      }
+    }
+
     // Specific V2.1 Hierarchy Depth Rules:
     // EPIC: parentId MUST be null
     if (params.childType === "EPIC") {
@@ -269,20 +284,6 @@ export class WorkItemService {
     if (params.childType === "BUG") {
       if (parent.type !== "EPIC" && parent.type !== "FEATURE") {
         throw new WorkItemHierarchyInvalidError("BUG parent must be an EPIC or a FEATURE.");
-      }
-    }
-
-    // Cycle Prevention Check
-    if (params.childId) {
-      if (params.parentId === params.childId) {
-        throw new WorkItemHierarchyCycleError();
-      }
-      const ancestors = await this.workItemRepo.findAncestors(
-        params.workspaceId,
-        params.parentId,
-      );
-      if (ancestors.some((ancestor) => ancestor.id === params.childId)) {
-        throw new WorkItemHierarchyCycleError();
       }
     }
   }
@@ -455,6 +456,15 @@ export class WorkItemService {
       );
     }
 
+    const children = await this.workItemRepo.findChildren(
+      params.workspaceId,
+      params.workItemId,
+    );
+
+    if (children.length > 0) {
+      throw new WorkItemHasChildrenError();
+    }
+
     const deleted = await this.workItemRepo.delete(
       params.workspaceId,
       params.workItemId,
@@ -517,14 +527,20 @@ export class WorkItemService {
       }
     }
 
-    if (params.parentId) {
-      await this.validateParentHierarchy({
-        workspaceId: params.workspaceId,
-        projectId: existing.projectId,
-        childType: existing.type,
-        parentId: params.parentId,
-        childId: existing.id,
-      });
+    if (params.parentId !== undefined) {
+      if (params.parentId === null) {
+        if (existing.type === "FEATURE") {
+          throw new WorkItemHierarchyInvalidError("FEATURE must have an EPIC parent.");
+        }
+      } else {
+        await this.validateParentHierarchy({
+          workspaceId: params.workspaceId,
+          projectId: existing.projectId,
+          childType: existing.type,
+          parentId: params.parentId,
+          childId: existing.id,
+        });
+      }
     }
 
     const updates: Partial<typeof existing> = {};

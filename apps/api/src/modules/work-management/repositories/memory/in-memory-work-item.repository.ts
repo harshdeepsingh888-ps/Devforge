@@ -133,6 +133,11 @@ export class InMemoryWorkItemRepository implements WorkItemRepository {
     if (!existing) {
       return false;
     }
+    for (const item of this.workItems.values()) {
+      if (item.workspaceId === workspaceId && item.parentId === workItemId) {
+        item.parentId = null;
+      }
+    }
     return this.workItems.delete(workItemId);
   }
 }

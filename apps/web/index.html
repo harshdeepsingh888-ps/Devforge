@@ -5,6 +5,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DevForge — Engineering Control Plane</title>
+    <script>
+      (function() {
+        try {
+          var mode = localStorage.getItem("devforge_theme_mode") || "AUTO";
+          var resolved = "light";
+          if (mode === "LIGHT") {
+            resolved = "light";
+          } else if (mode === "DARK") {
+            resolved = "dark";
+          } else {
+            var h = new Date().getHours();
+            resolved = (h >= 7 && h < 19) ? "light" : "dark";
+          }
+          document.documentElement.setAttribute("data-theme", resolved);
+          if (resolved === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

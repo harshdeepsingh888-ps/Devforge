@@ -162,15 +162,15 @@ export const App: React.FC = () => {
         setProjects(projectList);
 
         /*
-         * Current Phase 1 behavior:
-         *
-         * If projects exist, open the first project.
-         *
-         * If none exist, ProjectGate will provide
-         * the Create Project flow.
+         * Auto-select the first active (non-archived) project.
+         * If no active project exists, open ProjectGate.
          */
-        if (projectList.length > 0) {
-          setActiveProject(projectList[0]);
+        const activeProjects = projectList.filter(
+          (p) => p.status !== "ARCHIVED",
+        );
+
+        if (activeProjects.length > 0) {
+          setActiveProject(activeProjects[0]);
         } else {
           setActiveProject(null);
         }
@@ -311,6 +311,47 @@ export const App: React.FC = () => {
   };
 
   /*
+   * PROJECT UPDATED (Status / Archive / Restore)
+   */
+  const handleProjectUpdated = (
+    updatedProject: Project,
+  ): void => {
+    setProjects((current) =>
+      current.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
+    );
+
+    // If the active project is archived, safely switch or clear selection
+    if (activeProject?.id === updatedProject.id) {
+      if (updatedProject.status === "ARCHIVED") {
+        const remainingActive = projects.filter(
+          (p) => p.id !== updatedProject.id && p.status !== "ARCHIVED",
+        );
+        setActiveProject(remainingActive.length > 0 ? remainingActive[0] : null);
+      } else {
+        setActiveProject(updatedProject);
+      }
+    }
+  };
+
+  /*
+   * PROJECT DELETED
+   */
+  const handleProjectDeleted = (
+    deletedProjectId: string,
+  ): void => {
+    setProjects((current) =>
+      current.filter((p) => p.id !== deletedProjectId),
+    );
+
+    if (activeProject?.id === deletedProjectId) {
+      const remainingActive = projects.filter(
+        (p) => p.id !== deletedProjectId && p.status !== "ARCHIVED",
+      );
+      setActiveProject(remainingActive.length > 0 ? remainingActive[0] : null);
+    }
+  };
+
+  /*
    * SWITCH WORKSPACE
    *
    * Returning activeWorkspace to null causes
@@ -441,6 +482,8 @@ export const App: React.FC = () => {
       activeProject={activeProject}
       onSelectProject={setActiveProject}
       onProjectCreated={handleProjectCreated}
+      onProjectUpdated={handleProjectUpdated}
+      onProjectDeleted={handleProjectDeleted}
       onSwitchWorkspace={handleSwitchWorkspace}
     >
       <WorkStream

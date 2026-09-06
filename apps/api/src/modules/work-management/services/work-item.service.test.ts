@@ -364,8 +364,27 @@ test("State Machine Transitions: explicit allowed transitions vs unlinked transi
   });
 
   assert.equal(transitioned.workflowStateId, inProgressState.id);
+  assert.equal(transitioned.completedAt, null);
 
-  // Transition In Progress -> Done (Allowed)
+  // Transition In Progress -> Backlog (Reversible Transition - Allowed)
+  const backToBacklog = await workItemService.transitionState({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+    targetStateId: backlogState.id,
+  });
+
+  assert.equal(backToBacklog.workflowStateId, backlogState.id);
+  assert.equal(backToBacklog.completedAt, null);
+
+  // Transition Backlog -> In Progress -> Done (Allowed)
+  await workItemService.transitionState({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+    targetStateId: inProgressState.id,
+  });
+
   const doneItem = await workItemService.transitionState({
     workspaceId: ws1.id,
     workItemId: task.id,
@@ -376,7 +395,26 @@ test("State Machine Transitions: explicit allowed transitions vs unlinked transi
   assert.equal(doneItem.workflowStateId, doneState.id);
   assert.ok(doneItem.completedAt);
 
-  // Unlinked Transition: Attempting Done -> Backlog (not linked in workflow) -> throws InvalidStateTransitionError
+  // Transition Done -> In Progress (Reversible Transition - Allowed)
+  const reopenedItem = await workItemService.transitionState({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+    targetStateId: inProgressState.id,
+  });
+
+  assert.equal(reopenedItem.workflowStateId, inProgressState.id);
+  assert.equal(reopenedItem.completedAt, null); // completedAt must be cleared
+
+  // Unlinked Transition: Attempting Done -> Backlog (direct jump not linked) -> throws InvalidStateTransitionError
+  // Move back to Done first
+  await workItemService.transitionState({
+    workspaceId: ws1.id,
+    workItemId: task.id,
+    actorUserId: "dev-1",
+    targetStateId: doneState.id,
+  });
+
   await assert.rejects(
     async () => {
       await workItemService.transitionState({
@@ -388,6 +426,27 @@ test("State Machine Transitions: explicit allowed transitions vs unlinked transi
     },
     InvalidStateTransitionError,
   );
+});
+
+test("Workflow Reversibility: legacy default workflow with only forward transitions is automatically upgraded", async () => {
+  const { ws1, project1, workItemService, workflowRepo } = await setupTestContext();
+
+  const defaultWf = await workflowRepo.findDefaultWorkflow(ws1.id);
+  assert.ok(defaultWf);
+
+  const transitions = await workflowRepo.findTransitionsByWorkflow(defaultWf.id);
+  // Must have all 4 transitions
+  assert.equal(transitions.length, 4);
+
+  const states = await workflowRepo.findStatesByWorkflow(defaultWf.id);
+  const backlog = states.find((s) => s.category === "BACKLOG")!;
+  const inProgress = states.find((s) => s.category === "STARTED")!;
+  const done = states.find((s) => s.category === "COMPLETED")!;
+
+  assert.ok(transitions.some((t) => t.fromStateId === backlog.id && t.toStateId === inProgress.id));
+  assert.ok(transitions.some((t) => t.fromStateId === inProgress.id && t.toStateId === backlog.id));
+  assert.ok(transitions.some((t) => t.fromStateId === inProgress.id && t.toStateId === done.id));
+  assert.ok(transitions.some((t) => t.fromStateId === done.id && t.toStateId === inProgress.id));
 });
 
 test("Assignment Invariants: rejects non-workspace member or non-workspace team", async () => {

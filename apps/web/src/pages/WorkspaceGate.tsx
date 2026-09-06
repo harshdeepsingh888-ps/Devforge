@@ -50,7 +50,7 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
       <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
         <section className="w-full max-w-md space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#858585] uppercase">
+            <div className="text-[10px] font-sans font-bold tracking-widest text-[#858585] uppercase">
               DEVFORGE
             </div>
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#0a0a0a]">
@@ -116,7 +116,7 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
     <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
       <section className="w-full max-w-lg space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
         <div>
-          <div className="text-[10px] font-mono font-bold tracking-widest text-[#858585] uppercase">
+          <div className="text-[10px] font-sans font-bold tracking-widest text-[#858585] uppercase">
             DEVFORGE
           </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#0a0a0a]">

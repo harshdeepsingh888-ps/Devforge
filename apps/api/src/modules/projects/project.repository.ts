@@ -18,6 +18,10 @@ export interface ProjectRepository {
     projectId: string,
     status: ProjectStatus,
   ): Promise<Project | null>;
+  delete(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<boolean>;
 }
 
 export class InMemoryProjectRepository
@@ -86,5 +90,16 @@ export class InMemoryProjectRepository
     this.projects.set(projectId, updatedProject);
 
     return updatedProject;
+  }
+
+  async delete(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const project = await this.findById(workspaceId, projectId);
+    if (!project) {
+      return false;
+    }
+    return this.projects.delete(projectId);
   }
 }

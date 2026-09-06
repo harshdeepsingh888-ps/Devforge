@@ -9,6 +9,8 @@ interface AppShellProps {
   activeProject: Project;
   onSelectProject: (project: Project) => void;
   onProjectCreated: (project: Project) => void;
+  onProjectUpdated: (project: Project) => void;
+  onProjectDeleted: (projectId: string) => void;
   onSwitchWorkspace: () => void;
   children: React.ReactNode;
 }
@@ -19,6 +21,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   activeProject,
   onSelectProject,
   onProjectCreated,
+  onProjectUpdated,
+  onProjectDeleted,
   onSwitchWorkspace,
   children,
 }) => {
@@ -35,19 +39,23 @@ export const AppShell: React.FC<AppShellProps> = ({
       <Topbar
         workspace={workspace}
         project={activeProject}
+        projects={projects.filter((p) => p.status !== "ARCHIVED")}
+        onSelectProject={onSelectProject}
         onSwitchWorkspace={onSwitchWorkspace}
         onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
       />
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* DESKTOP SIDEBAR */}
-        <div className="hidden md:block shrink-0">
+        <div className="hidden md:block shrink-0 h-full">
           <Sidebar
             workspace={workspace}
             projects={projects}
             activeProject={activeProject}
             onSelectProject={onSelectProject}
             onProjectCreated={onProjectCreated}
+            onProjectUpdated={onProjectUpdated}
+            onProjectDeleted={onProjectDeleted}
             onSwitchWorkspace={onSwitchWorkspace}
           />
         </div>
@@ -71,14 +79,19 @@ export const AppShell: React.FC<AppShellProps> = ({
                   onProjectCreated(p);
                   setMobileSidebarOpen(false);
                 }}
+                onProjectUpdated={onProjectUpdated}
+                onProjectDeleted={(id) => {
+                  onProjectDeleted(id);
+                  setMobileSidebarOpen(false);
+                }}
                 onSwitchWorkspace={onSwitchWorkspace}
               />
             </div>
           </div>
         )}
 
-        {/* MAIN CONTENT AREA */}
-        <div className="min-w-0 flex-1 overflow-y-auto bg-[#ffffff]">
+        {/* MAIN INSET WORKSPACE CONTENT */}
+        <div className="min-w-0 flex-1 flex flex-col overflow-hidden bg-[#f9f8f6]">
           {children}
         </div>
       </div>

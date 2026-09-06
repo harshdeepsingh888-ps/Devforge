@@ -97,14 +97,84 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
       id: randomUUID(),
       workflowId: workflow.id,
       fromStateId: inProgressState.id,
-      toStateId: doneState.id,
+      toStateId: backlogState.id,
       name: null,
       requiredRole: null,
       createdAt: timestamp,
     };
     this.transitions.set(t2.id, t2);
 
+    const t3: StateTransition = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      fromStateId: inProgressState.id,
+      toStateId: doneState.id,
+      name: null,
+      requiredRole: null,
+      createdAt: timestamp,
+    };
+    this.transitions.set(t3.id, t3);
+
+    const t4: StateTransition = {
+      id: randomUUID(),
+      workflowId: workflow.id,
+      fromStateId: doneState.id,
+      toStateId: inProgressState.id,
+      name: null,
+      requiredRole: null,
+      createdAt: timestamp,
+    };
+    this.transitions.set(t4.id, t4);
+
     return workflow;
+  }
+
+  ensureDefaultTransitions(workflowId: string): void {
+    const workflow = this.workflows.get(workflowId);
+    if (!workflow || !workflow.isDefault) return;
+
+    const states = Array.from(this.states.values()).filter(
+      (s) => s.workflowId === workflowId,
+    );
+    const backlog = states.find(
+      (s) => s.isInitial || s.category === "BACKLOG" || s.name === "Backlog",
+    );
+    const inProgress = states.find(
+      (s) => s.category === "STARTED" || s.name === "In Progress",
+    );
+    const done = states.find(
+      (s) => s.isTerminal || s.category === "COMPLETED" || s.name === "Done",
+    );
+
+    if (backlog && inProgress && done) {
+      const required = [
+        { from: backlog.id, to: inProgress.id },
+        { from: inProgress.id, to: backlog.id },
+        { from: inProgress.id, to: done.id },
+        { from: done.id, to: inProgress.id },
+      ];
+
+      for (const t of required) {
+        const existing = Array.from(this.transitions.values()).find(
+          (tr) =>
+            tr.workflowId === workflowId &&
+            tr.fromStateId === t.from &&
+            tr.toStateId === t.to,
+        );
+        if (!existing) {
+          const newTr: StateTransition = {
+            id: randomUUID(),
+            workflowId,
+            fromStateId: t.from,
+            toStateId: t.to,
+            name: null,
+            requiredRole: null,
+            createdAt: new Date().toISOString(),
+          };
+          this.transitions.set(newTr.id, newTr);
+        }
+      }
+    }
   }
 
   async findWorkflowById(
@@ -121,6 +191,7 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
   async findDefaultWorkflow(workspaceId: string): Promise<Workflow | null> {
     for (const workflow of this.workflows.values()) {
       if (workflow.workspaceId === workspaceId && workflow.isDefault) {
+        this.ensureDefaultTransitions(workflow.id);
         return workflow;
       }
     }
@@ -256,6 +327,7 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
     fromStateId: string,
     toStateId: string,
   ): Promise<StateTransition | null> {
+    this.ensureDefaultTransitions(workflowId);
     for (const transition of this.transitions.values()) {
       if (
         transition.workflowId === workflowId &&
@@ -271,6 +343,7 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
   async findTransitionsByWorkflow(
     workflowId: string,
   ): Promise<StateTransition[]> {
+    this.ensureDefaultTransitions(workflowId);
     const results: StateTransition[] = [];
     for (const transition of this.transitions.values()) {
       if (transition.workflowId === workflowId) {

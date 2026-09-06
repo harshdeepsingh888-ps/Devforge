@@ -44,6 +44,8 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
     }
   };
 
+  const activeProjects = projects.filter((p) => p.status !== "ARCHIVED");
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
       <section className="w-full max-w-lg space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
@@ -52,18 +54,18 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
             Workspace: {workspace.name}
           </span>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#0a0a0a]">
-            {projects.length === 0 ? "Create Project" : "Select Project"}
+            {activeProjects.length === 0 ? "Create Project" : "Select Project"}
           </h1>
           <p className="mt-1 text-xs text-[#858585]">
-            {projects.length === 0
+            {activeProjects.length === 0
               ? "Projects organize engineering work inside this workspace."
               : "Select a project to open its Work Stream."}
           </p>
         </div>
 
-        {projects.length > 0 && (
+        {activeProjects.length > 0 && (
           <div className="space-y-2">
-            {projects.map((project) => (
+            {activeProjects.map((project) => (
               <button
                 key={project.id}
                 type="button"
@@ -85,7 +87,7 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
               htmlFor="project-name"
               className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#858585]"
             >
-              {projects.length === 0 ? "Project name *" : "Create another project"}
+              {activeProjects.length === 0 ? "Project name *" : "Create another project"}
             </label>
 
             <input

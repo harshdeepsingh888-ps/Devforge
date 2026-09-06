@@ -350,3 +350,242 @@ test("@devforge/web: Type-Aware Work Item Creation Modal & Invariants", () => {
   );
 });
 
+test("@devforge/web: Interactive Topbar Breadcrumb & Project Switcher Resolution", () => {
+  const workspace = { id: "ws-1", name: "DevForge Team" };
+  const projects = [
+    { id: "proj-1", name: "Core Engine", workspaceId: "ws-1" },
+    { id: "proj-2", name: "Web App", workspaceId: "ws-1" },
+    { id: "proj-3", name: "Mobile SDK", workspaceId: "ws-1" },
+  ];
+  let activeProject = projects[0];
+  let activeWorkspace: typeof workspace | null = workspace;
+
+  // 1. Workspace breadcrumb click -> returns to workspace selector
+  const handleSwitchWorkspace = () => {
+    activeWorkspace = null;
+  };
+
+  handleSwitchWorkspace();
+  assert.equal(activeWorkspace, null);
+
+  // Restore workspace
+  activeWorkspace = workspace;
+
+  // 2. Project switcher selection
+  const handleSelectProject = (project: (typeof projects)[0]) => {
+    activeProject = project;
+  };
+
+  assert.equal(activeProject.id, "proj-1");
+  handleSelectProject(projects[1]);
+  assert.equal(activeProject.id, "proj-2");
+  assert.equal(activeProject.name, "Web App");
+
+  handleSelectProject(projects[2]);
+  assert.equal(activeProject.id, "proj-3");
+  assert.equal(activeProject.name, "Mobile SDK");
+});
+
+test("@devforge/web: Reversible Workflow Target States Resolution", () => {
+  const states = [
+    { id: "s-backlog", name: "Backlog", category: "BACKLOG", position: 0 },
+    { id: "s-progress", name: "In Progress", category: "STARTED", position: 1 },
+    { id: "s-done", name: "Done", category: "COMPLETED", position: 2 },
+  ];
+
+  const transitions = [
+    { fromStateId: "s-backlog", toStateId: "s-progress" },
+    { fromStateId: "s-progress", toStateId: "s-backlog" },
+    { fromStateId: "s-progress", toStateId: "s-done" },
+    { fromStateId: "s-done", toStateId: "s-progress" },
+  ];
+
+  const getAllowedTargetStates = (currentStateId: string) => {
+    const validTransitions = transitions.filter(
+      (t) => t.fromStateId === currentStateId,
+    );
+    const validTargetIds = new Set(validTransitions.map((t) => t.toStateId));
+    return states.filter((state) => validTargetIds.has(state.id));
+  };
+
+  // 1. Backlog item targets -> In Progress only
+  const backlogTargets = getAllowedTargetStates("s-backlog");
+  assert.equal(backlogTargets.length, 1);
+  assert.equal(backlogTargets[0].id, "s-progress");
+
+  // 2. In Progress item targets -> Backlog AND Done (Reversible!)
+  const inProgressTargets = getAllowedTargetStates("s-progress");
+  assert.equal(inProgressTargets.length, 2);
+  assert.ok(inProgressTargets.some((t) => t.id === "s-backlog"));
+  assert.ok(inProgressTargets.some((t) => t.id === "s-done"));
+
+  // 3. Done item targets -> In Progress (Reversible!)
+  const doneTargets = getAllowedTargetStates("s-done");
+  assert.equal(doneTargets.length, 1);
+  assert.equal(doneTargets[0].id, "s-progress");
+});
+
+test("@devforge/web: Project Pin Persistence, Sorting & Stale ID Cleanup", () => {
+  const workspaceId = "ws-1";
+  const projects = [
+    { id: "p-1", name: "Alpha", workspaceId, status: "ACTIVE" },
+    { id: "p-2", name: "Beta", workspaceId, status: "ACTIVE" },
+    { id: "p-3", name: "Gamma", workspaceId, status: "ACTIVE" },
+  ];
+
+  // 1. Storage simulation
+  const storage: Record<string, string> = {};
+  const PIN_KEY = `devforge_pinned_${workspaceId}`;
+
+  const storePins = (ids: string[]) => {
+    storage[PIN_KEY] = JSON.stringify(ids);
+  };
+  const getPins = () => {
+    try {
+      return JSON.parse(storage[PIN_KEY] || "[]") as string[];
+    } catch {
+      return [];
+    }
+  };
+
+  // Pin p-2 and p-3
+  storePins(["p-2", "p-3"]);
+  let pinnedIds = getPins();
+  assert.deepEqual(pinnedIds, ["p-2", "p-3"]);
+
+  // 2. Sort active projects: pinned first, preserving order
+  const sortProjects = (projs: typeof projects, pins: string[]) => {
+    const active = projs.filter((p) => p.status !== "ARCHIVED");
+    const pinned = active.filter((p) => pins.includes(p.id));
+    const unpinned = active.filter((p) => !pins.includes(p.id));
+    return [...pinned, ...unpinned];
+  };
+
+  const sorted = sortProjects(projects, pinnedIds);
+  assert.equal(sorted.length, 3);
+  assert.equal(sorted[0].id, "p-2");
+  assert.equal(sorted[1].id, "p-3");
+  assert.equal(sorted[2].id, "p-1");
+
+  // 3. Stale ID cleanup when a project is removed
+  const updatedProjects = [projects[0], projects[1]]; // p-3 removed
+  const validPins = pinnedIds.filter((id) =>
+    updatedProjects.some((p) => p.id === id),
+  );
+  assert.deepEqual(validPins, ["p-2"]); // p-3 stale ID cleaned up
+});
+
+test("@devforge/web: Project Archive & Restore Lifecycle Invariants", () => {
+  let projects = [
+    { id: "p-1", name: "Active Alpha", status: "ACTIVE" },
+    { id: "p-2", name: "Active Beta", status: "ACTIVE" },
+    { id: "p-3", name: "Archived Gamma", status: "ARCHIVED" },
+  ];
+
+  let activeProject: (typeof projects)[0] | null = projects[0];
+
+  // 1. Initial partition
+  const getActive = () => projects.filter((p) => p.status !== "ARCHIVED");
+  const getArchived = () => projects.filter((p) => p.status === "ARCHIVED");
+
+  assert.equal(getActive().length, 2);
+  assert.equal(getArchived().length, 1);
+
+  // 2. Archive active project (p-1) -> switches selection to next active project (p-2)
+  const handleProjectUpdated = (updated: (typeof projects)[0]) => {
+    projects = projects.map((p) => (p.id === updated.id ? updated : p));
+    if (activeProject?.id === updated.id) {
+      if (updated.status === "ARCHIVED") {
+        const remaining = projects.filter(
+          (p) => p.id !== updated.id && p.status !== "ARCHIVED",
+        );
+        activeProject = remaining.length > 0 ? remaining[0] : null;
+      } else {
+        activeProject = updated;
+      }
+    }
+  };
+
+  handleProjectUpdated({ id: "p-1", name: "Active Alpha", status: "ARCHIVED" });
+  assert.equal(getActive().length, 1);
+  assert.equal(getArchived().length, 2);
+  assert.equal(activeProject?.id, "p-2"); // Safely switched to p-2
+
+  // 3. Archive p-2 when no other active projects remain -> activeProject becomes null
+  handleProjectUpdated({ id: "p-2", name: "Active Beta", status: "ARCHIVED" });
+  assert.equal(getActive().length, 0);
+  assert.equal(getArchived().length, 3);
+  assert.equal(activeProject, null); // Safely returns to ProjectGate
+
+  // 4. Restore p-1 -> returns to active list
+  handleProjectUpdated({ id: "p-1", name: "Active Alpha", status: "ACTIVE" });
+  assert.equal(getActive().length, 1);
+  assert.equal(getArchived().length, 2);
+});
+
+test("@devforge/web: Project Deletion & Safe State Cleanup", () => {
+  let projects = [
+    { id: "p-1", name: "Project 1", status: "ACTIVE" },
+    { id: "p-2", name: "Project 2", status: "ACTIVE" },
+  ];
+  let pinnedIds = ["p-1"];
+  let activeProject: (typeof projects)[0] | null = projects[0];
+
+  const handleProjectDeleted = (deletedId: string) => {
+    projects = projects.filter((p) => p.id !== deletedId);
+    pinnedIds = pinnedIds.filter((id) => id !== deletedId);
+
+    if (activeProject?.id === deletedId) {
+      const remainingActive = projects.filter((p) => p.status !== "ARCHIVED");
+      activeProject = remainingActive.length > 0 ? remainingActive[0] : null;
+    }
+  };
+
+  // Delete active project p-1
+  handleProjectDeleted("p-1");
+
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].id, "p-2");
+  assert.deepEqual(pinnedIds, []); // Pinned state cleaned up
+  assert.equal(activeProject?.id, "p-2"); // Switched to remaining active project
+
+  // Delete last active project p-2
+  handleProjectDeleted("p-2");
+  assert.equal(projects.length, 0);
+  assert.equal(activeProject, null); // Cleared cleanly, no stale data
+});
+
+test("@devforge/web: Empty Board vs Populated Board Rendering Invariants", () => {
+  const workflowStates = [
+    { id: "s-backlog", name: "Backlog", position: 0 },
+    { id: "s-progress", name: "In Progress", position: 1 },
+    { id: "s-done", name: "Done", position: 2 },
+  ];
+
+  const determineBoardLayout = (itemsCount: number) => {
+    if (itemsCount === 0) {
+      return {
+        showEmptyState: true,
+        showColumnBodies: false,
+        workflowContext: workflowStates.map((s) => s.name).join(" → "),
+      };
+    }
+    return {
+      showEmptyState: false,
+      showColumnBodies: true,
+      workflowContext: null,
+    };
+  };
+
+  // Case 1: 0 work items in project -> single empty state with workflow context, 0 column bodies
+  const emptyBoard = determineBoardLayout(0);
+  assert.equal(emptyBoard.showEmptyState, true);
+  assert.equal(emptyBoard.showColumnBodies, false);
+  assert.equal(emptyBoard.workflowContext, "Backlog → In Progress → Done");
+
+  // Case 2: Populated project (e.g. 5 work items) -> normal column tracks rendered, no empty state
+  const populatedBoard = determineBoardLayout(5);
+  assert.equal(populatedBoard.showEmptyState, false);
+  assert.equal(populatedBoard.showColumnBodies, true);
+  assert.equal(populatedBoard.workflowContext, null);
+});

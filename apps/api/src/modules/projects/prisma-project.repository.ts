@@ -70,4 +70,19 @@ export class PrismaProjectRepository implements ProjectRepository {
 
     return toProjectDomain(updated);
   }
+
+  async delete(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const existing = await this.findById(workspaceId, projectId);
+    if (!existing) return false;
+
+    await this.database.project.delete({
+      where: { id: projectId },
+    });
+
+    return true;
+  }
 }
+

@@ -63,7 +63,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
     <div className="fixed inset-0 flex items-center justify-center bg-[#ffffff] p-4 font-sans text-xs select-none">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
         <div className="space-y-1">
-          <div className="font-mono text-[10px] font-bold tracking-widest text-[#858585] uppercase">
+          <div className="font-sans text-[10px] font-bold tracking-widest text-[#858585] uppercase">
             DEVFORGE
           </div>
           <h1 className="text-xl font-bold tracking-tight text-[#0a0a0a]">

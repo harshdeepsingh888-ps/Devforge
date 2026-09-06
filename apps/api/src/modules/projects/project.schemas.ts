@@ -210,3 +210,31 @@ export const updateProjectStatusSchema = {
     404: projectNotFoundSchema,
   },
 } as const;
+
+export const deleteProjectSchema = {
+  tags: ["Projects"],
+  summary: "Delete a project",
+  description:
+    "Permanently deletes a project and cascades deletion of its work items, workflows, specs, and pipelines.",
+  params: {
+    type: "object",
+    additionalProperties: false,
+    required: ["workspaceId", "projectId"],
+    properties: {
+      workspaceId: {
+        type: "string",
+      },
+      projectId: {
+        type: "string",
+      },
+    },
+  },
+  response: {
+    204: {
+      type: "null",
+      description: "Project deleted successfully.",
+    },
+    404: projectNotFoundSchema,
+  },
+} as const;
+

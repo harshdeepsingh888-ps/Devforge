@@ -124,12 +124,67 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
         {
           workflowId: workflow.id,
           fromStateId: inProgress.id,
+          toStateId: backlog.id,
+        },
+        {
+          workflowId: workflow.id,
+          fromStateId: inProgress.id,
           toStateId: done.id,
         },
+        {
+          workflowId: workflow.id,
+          fromStateId: done.id,
+          toStateId: inProgress.id,
+        },
       ],
+      skipDuplicates: true,
     });
 
     return toWorkflowDomain(workflow);
+  }
+
+  async ensureDefaultTransitions(workflowId: string): Promise<void> {
+    const states = await this.database.workflowState.findMany({
+      where: { workflowId },
+      orderBy: { position: "asc" },
+    });
+    const backlog = states.find(
+      (s) => s.isInitial || s.category === "BACKLOG" || s.name === "Backlog",
+    );
+    const inProgress = states.find(
+      (s) => s.category === "STARTED" || s.name === "In Progress",
+    );
+    const done = states.find(
+      (s) => s.isTerminal || s.category === "COMPLETED" || s.name === "Done",
+    );
+
+    if (backlog && inProgress && done) {
+      const required = [
+        { fromStateId: backlog.id, toStateId: inProgress.id },
+        { fromStateId: inProgress.id, toStateId: backlog.id },
+        { fromStateId: inProgress.id, toStateId: done.id },
+        { fromStateId: done.id, toStateId: inProgress.id },
+      ];
+
+      for (const t of required) {
+        const existing = await this.database.stateTransition.findFirst({
+          where: {
+            workflowId,
+            fromStateId: t.fromStateId,
+            toStateId: t.toStateId,
+          },
+        });
+        if (!existing) {
+          await this.database.stateTransition.create({
+            data: {
+              workflowId,
+              fromStateId: t.fromStateId,
+              toStateId: t.toStateId,
+            },
+          });
+        }
+      }
+    }
   }
 
   async findWorkflowById(
@@ -146,7 +201,11 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     const workflow = await this.database.workflow.findFirst({
       where: { workspaceId, isDefault: true },
     });
-    return workflow ? toWorkflowDomain(workflow) : null;
+    if (workflow) {
+      await this.ensureDefaultTransitions(workflow.id);
+      return toWorkflowDomain(workflow);
+    }
+    return null;
   }
 
   async findWorkflowsByWorkspace(workspaceId: string): Promise<Workflow[]> {
@@ -260,15 +319,32 @@ export class PrismaWorkflowRepository implements WorkflowRepository {
     fromStateId: string,
     toStateId: string,
   ): Promise<StateTransition | null> {
-    const transition = await this.database.stateTransition.findFirst({
+    let transition = await this.database.stateTransition.findFirst({
       where: { workflowId, fromStateId, toStateId },
     });
+    if (!transition) {
+      const workflow = await this.database.workflow.findUnique({
+        where: { id: workflowId },
+      });
+      if (workflow?.isDefault) {
+        await this.ensureDefaultTransitions(workflowId);
+        transition = await this.database.stateTransition.findFirst({
+          where: { workflowId, fromStateId, toStateId },
+        });
+      }
+    }
     return transition ? toTransitionDomain(transition) : null;
   }
 
   async findTransitionsByWorkflow(
     workflowId: string,
   ): Promise<StateTransition[]> {
+    const workflow = await this.database.workflow.findUnique({
+      where: { id: workflowId },
+    });
+    if (workflow?.isDefault) {
+      await this.ensureDefaultTransitions(workflowId);
+    }
     const transitions = await this.database.stateTransition.findMany({
       where: { workflowId },
     });

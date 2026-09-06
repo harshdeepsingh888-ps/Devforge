@@ -177,3 +177,140 @@ test("PATCH /api/workspaces/:workspaceId/projects/:projectId/status updates stat
   assert.equal(patchRes.statusCode, 200);
   assert.equal(patchRes.json().data.status, "PAUSED");
 });
+
+test("DELETE /api/workspaces/:workspaceId/projects/:projectId succeeds for OWNER and ADMIN", async (t) => {
+  const { app, workspace, workspaceService, projectRepository } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-admin-1",
+    role: "ADMIN",
+  });
+
+  const p1 = await projectRepository.create({
+    workspaceId: workspace.id,
+    name: "Project to delete by Owner",
+  });
+
+  const p2 = await projectRepository.create({
+    workspaceId: workspace.id,
+    name: "Project to delete by Admin",
+  });
+
+  const ownerHeader = await getAuthHeader("user-owner-1");
+  const adminHeader = await getAuthHeader("user-admin-1");
+
+  // Owner deletes p1 -> 204
+  const delOwnerRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${workspace.id}/projects/${p1.id}`,
+    headers: ownerHeader,
+  });
+  assert.equal(delOwnerRes.statusCode, 204);
+
+  // Admin deletes p2 -> 204
+  const delAdminRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${workspace.id}/projects/${p2.id}`,
+    headers: adminHeader,
+  });
+  assert.equal(delAdminRes.statusCode, 204);
+
+  // Ensure projects are no longer returned in list
+  const listRes = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: ownerHeader,
+  });
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.json().data.length, 0);
+});
+
+test("DELETE /api/workspaces/:workspaceId/projects/:projectId returns 403 for DEVELOPER and VIEWER", async (t) => {
+  const { app, workspace, workspaceService, projectRepository } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-dev-1",
+    role: "DEVELOPER",
+  });
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-viewer-1",
+    role: "VIEWER",
+  });
+
+  const project = await projectRepository.create({
+    workspaceId: workspace.id,
+    name: "Protected Project",
+  });
+
+  const devHeader = await getAuthHeader("user-dev-1");
+  const viewerHeader = await getAuthHeader("user-viewer-1");
+
+  const devRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${workspace.id}/projects/${project.id}`,
+    headers: devHeader,
+  });
+  assert.equal(devRes.statusCode, 403);
+  assert.equal(devRes.json().error, "FORBIDDEN");
+
+  const viewerRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${workspace.id}/projects/${project.id}`,
+    headers: viewerHeader,
+  });
+  assert.equal(viewerRes.statusCode, 403);
+  assert.equal(viewerRes.json().error, "FORBIDDEN");
+});
+
+test("DELETE /api/workspaces/:workspaceId/projects/:projectId enforces cross-workspace protection and 404", async (t) => {
+  const { app, workspaceService, workspace: ws1, projectRepository } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const ws2 = await workspaceService.createWorkspace({
+    name: "Other Workspace",
+    creatorUserId: "user-owner-2",
+  });
+
+  const ws2Project = await projectRepository.create({
+    workspaceId: ws2.id,
+    name: "WS2 Project",
+  });
+
+  const owner1Header = await getAuthHeader("user-owner-1");
+
+  // Attempt to delete ws2Project from ws1 context -> 404 (does not belong to ws1)
+  const crossRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${ws1.id}/projects/${ws2Project.id}`,
+    headers: owner1Header,
+  });
+  assert.equal(crossRes.statusCode, 404);
+  assert.equal(crossRes.json().error, "PROJECT_NOT_FOUND");
+
+  // Attempt to delete nonexistent project -> 404
+  const nonExistentRes = await app.inject({
+    method: "DELETE",
+    url: `/api/workspaces/${ws1.id}/projects/non-existent-id`,
+    headers: owner1Header,
+  });
+  assert.equal(nonExistentRes.statusCode, 404);
+  assert.equal(nonExistentRes.json().error, "PROJECT_NOT_FOUND");
+});
+

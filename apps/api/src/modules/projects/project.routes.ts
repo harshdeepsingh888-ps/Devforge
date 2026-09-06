@@ -3,13 +3,17 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ProjectRepository } from "./project.repository.js";
 import {
   createProjectSchema,
+  deleteProjectSchema,
   getProjectSchema,
   listProjectsSchema,
   updateProjectStatusSchema,
 } from "./project.schemas.js";
 import type { ProjectStatus } from "./project.types.js";
 import type { WorkspaceService } from "../workspaces/services/workspace.service.js";
-import { createWorkspaceTenantGuard } from "../workspaces/plugins/workspace-tenant.plugin.js";
+import {
+  createWorkspaceTenantGuard,
+  requireWorkspaceRole,
+} from "../workspaces/plugins/workspace-tenant.plugin.js";
 
 interface ProjectRoutesOptions {
   repository: ProjectRepository;
@@ -144,4 +148,30 @@ export const projectRoutes: FastifyPluginAsync<
       };
     },
   );
+
+  app.delete<{
+    Params: WorkspaceProjectParams;
+  }>(
+    "/:projectId",
+    {
+      schema: deleteProjectSchema,
+      preHandler: [requireWorkspaceRole("ADMIN")],
+    },
+    async (request, reply) => {
+      const deleted = await options.repository.delete(
+        request.params.workspaceId,
+        request.params.projectId,
+      );
+
+      if (!deleted) {
+        return reply.code(404).send({
+          error: "PROJECT_NOT_FOUND",
+          message: "Project not found.",
+        });
+      }
+
+      return reply.code(204).send();
+    },
+  );
 };
+

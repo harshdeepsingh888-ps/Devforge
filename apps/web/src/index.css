@@ -3,18 +3,29 @@
 @tailwind utilities;
 
 :root {
+  /* LIGHT MODE (Preserved exactly as approved) */
   --df-page: #ffffff;
   --df-surface: #f9f8f6;
   --df-surface-subtle: #f2ede5;
+  --df-surface-card: #ffffff;
+  --df-surface-elevated: #ffffff;
   --df-surface-hover: #ebe5db;
   --df-surface-active: #e2dcce;
 
   --df-border: #d5d9e2;
+  --df-border-subtle: #e5e7eb;
   --df-border-strong: #b0b7c3;
+  --df-border-focus: #0a0a0a;
 
   --df-text: #0a0a0a;
   --df-text-secondary: #737373;
   --df-text-muted: #858585;
+  --df-accent: #0a0a0a;
+
+  --df-primary-btn-bg: #0a0a0a;
+  --df-primary-btn-text: #ffffff;
+  --df-primary-btn-border: #0a0a0a;
+  --df-primary-btn-hover: #262626;
 
   --df-code-bg: #151515;
   --df-code-text: #f4f4f5;
@@ -32,6 +43,64 @@
   background: var(--df-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+[data-theme="dark"],
+.dark {
+  /* ==========================================================================
+     DEVFORGE HARDWARE DARK THEME SYSTEM
+     Surface Hierarchy:
+       Level 1 (Outer Hardware Chassis): Deepest warm black (#0a0a09)
+       Level 2 (Structural Shell):       Warm charcoal (#111110) - Sidebar, Topbar, Inspector Shell
+       Level 3 (Inset Inner Workspace):  Warm dark surface (#161514)
+       Level 3b (Board Scaffolding):     Quiet track (#1a1918)
+       Level 4 (Elevated Card Records):  Elevated warm charcoal (#232220) with precise hairline border
+       Level 5 (Cream Emphasis):         Signature DevForge Cream (#f2ede5) for active/primary actions
+     ========================================================================== */
+
+  /* Level 1: Outer Hardware Chassis */
+  --df-page: #0a0a09;
+
+  /* Level 2: Structural Shell (Sidebar, Topbar, Inspector Shell) */
+  --df-surface: #111110;
+
+  /* Level 3: Inset Scaffolding / Column Tracks */
+  --df-surface-subtle: #1a1918;
+
+  /* Level 4: Work-Item Card / Primary Elevated Surface */
+  --df-surface-card: #232220;
+
+  /* Elevated / Interactive Surface (Inputs, Modals, Popups, Active Pills) */
+  --df-surface-elevated: #232220;
+  --df-surface-input: #161514;
+
+  /* Hover & Active States (150ms smooth transition) */
+  --df-surface-hover: #292826;
+  --df-surface-active: #302f2c;
+
+  /* Hairline Borders (Warm neutral tuned with clean opacities) */
+  --df-border: rgba(242, 237, 229, 0.08);
+  --df-border-subtle: rgba(242, 237, 229, 0.05);
+  --df-border-strong: rgba(242, 237, 229, 0.16);
+  --df-border-focus: #f2ede5;
+
+  /* Text & Inks */
+  --df-text: #ffffff;
+  --df-text-secondary: #9e9a93;
+  --df-text-muted: #6e6b66;
+
+  /* Signature DevForge Cream Accent */
+  --df-accent: #f2ede5;
+
+  /* Signature Cream Primary Actions in Dark Mode */
+  --df-primary-btn-bg: #f2ede5;
+  --df-primary-btn-text: #0a0a0a;
+  --df-primary-btn-border: #f2ede5;
+  --df-primary-btn-hover: #ffffff;
+
+  /* Technical Code & Terminal Surfaces */
+  --df-code-bg: #0d0d0c;
+  --df-code-text: #f2ede5;
 }
 
 * {
@@ -90,4 +159,218 @@ button:disabled {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b0b7c3;
+}
+
+/* ==========================================================================
+   DARK MODE ADAPTIVE UTILITIES
+   Transforms the light DESIGN.md palette into DevForge Warm Dark
+   without duplicating component markup or breaking responsive layouts.
+   ========================================================================== */
+
+[data-theme="dark"],
+.dark {
+  /* Canvas & Page Backgrounds */
+  background-color: var(--df-page);
+  color: var(--df-text);
+}
+
+[data-theme="dark"] body,
+.dark body {
+  background-color: var(--df-page);
+  color: var(--df-text);
+}
+
+/* Page canvas */
+[data-theme="dark"] .bg-\[\#ffffff\],
+.dark .bg-\[\#ffffff\] {
+  background-color: var(--df-page) !important;
+}
+
+/* Primary card / elevated surfaces (Work-item cards, modals, popups) */
+[data-theme="dark"] .bg-white,
+.dark .bg-white {
+  background-color: var(--df-surface-card) !important;
+}
+
+/* Differentiated Column headers */
+[data-theme="dark"] .bg-white\/40,
+.dark .bg-white\/40 {
+  background-color: #22211f !important;
+}
+
+/* Structural shell surfaces (Sidebar, Topbar, Inspector frame) */
+[data-theme="dark"] .bg-\[\#f9f8f6\],
+.dark .bg-\[\#f9f8f6\] {
+  background-color: var(--df-surface) !important;
+}
+
+/* Subtle tracks (Board column tracks, tab capsule tracks, subtle badges) */
+[data-theme="dark"] .bg-\[\#f2ede5\],
+[data-theme="dark"] .bg-\[\#f2ede5\]\/75,
+[data-theme="dark"] .bg-\[\#f2ede5\]\/70,
+[data-theme="dark"] .bg-\[\#f2ede5\]\/60,
+[data-theme="dark"] .bg-\[\#f2ede5\]\/50,
+[data-theme="dark"] .bg-\[\#f2ede5\]\/40,
+[data-theme="dark"] .bg-\[\#ebe6dc\],
+.dark .bg-\[\#f2ede5\],
+.dark .bg-\[\#f2ede5\]\/75,
+.dark .bg-\[\#f2ede5\]\/70,
+.dark .bg-\[\#f2ede5\]\/60,
+.dark .bg-\[\#f2ede5\]\/50,
+.dark .bg-\[\#f2ede5\]\/40,
+.dark .bg-\[\#ebe6dc\] {
+  background-color: var(--df-surface-subtle) !important;
+}
+
+/* Hairline Borders (Warm neutral hairline) */
+[data-theme="dark"] .border-\[\#d5d9e2\],
+[data-theme="dark"] .border-\[\#d5d9e2\]\/80,
+[data-theme="dark"] .border-\[\#d5d9e2\]\/60,
+.dark .border-\[\#d5d9e2\],
+.dark .border-\[\#d5d9e2\]\/80,
+.dark .border-\[\#d5d9e2\]\/60 {
+  border-color: var(--df-border) !important;
+}
+
+[data-theme="dark"] .border-\[\#e5e7eb\],
+.dark .border-\[\#e5e7eb\] {
+  border-color: var(--df-border-subtle) !important;
+}
+
+[data-theme="dark"] .border-\[\#f2ede5\],
+.dark .border-\[\#f2ede5\] {
+  border-color: var(--df-border-subtle) !important;
+}
+
+[data-theme="dark"] .divide-\[\#d5d9e2\] > :not([hidden]) ~ :not([hidden]),
+.dark .divide-\[\#d5d9e2\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--df-border) !important;
+}
+
+/* Text & Inks */
+[data-theme="dark"] .text-\[\#0a0a0a\],
+.dark .text-\[\#0a0a0a\] {
+  color: var(--df-text) !important;
+}
+
+[data-theme="dark"] .text-\[\#171717\],
+.dark .text-\[\#171717\] {
+  color: var(--df-text) !important;
+}
+
+[data-theme="dark"] .text-\[\#737373\],
+.dark .text-\[\#737373\] {
+  color: var(--df-text-secondary) !important;
+}
+
+[data-theme="dark"] .text-\[\#858585\],
+.dark .text-\[\#858585\] {
+  color: var(--df-text-muted) !important;
+}
+
+[data-theme="dark"] .text-\[\#525252\],
+.dark .text-\[\#525252\] {
+  color: var(--df-text-secondary) !important;
+}
+
+/* Primary Action Buttons & Interactive Highlights (DevForge Cream Inversion) */
+[data-theme="dark"] .bg-\[\#0a0a0a\],
+.dark .bg-\[\#0a0a0a\] {
+  background-color: var(--df-primary-btn-bg) !important;
+  color: var(--df-primary-btn-text) !important;
+  border-color: var(--df-primary-btn-border) !important;
+}
+
+[data-theme="dark"] .bg-\[\#0a0a0a\]:hover,
+[data-theme="dark"] .hover\:bg-\[\#262626\]:hover,
+.dark .bg-\[\#0a0a0a\]:hover,
+.dark .hover\:bg-\[\#262626\]:hover {
+  background-color: var(--df-primary-btn-hover) !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
+/* Hover States */
+[data-theme="dark"] .hover\:bg-\[\#f9f8f6\]:hover,
+[data-theme="dark"] .hover\:bg-\[\#f2ede5\]:hover,
+[data-theme="dark"] .hover\:bg-\[\#f2ede5\]\/70:hover,
+[data-theme="dark"] .hover\:bg-\[\#f2ede5\]\/50:hover,
+[data-theme="dark"] .hover\:bg-\[\#f2ede5\]\/40:hover,
+.dark .hover\:bg-\[\#f9f8f6\]:hover,
+.dark .hover\:bg-\[\#f2ede5\]:hover,
+.dark .hover\:bg-\[\#f2ede5\]\/70:hover,
+.dark .hover\:bg-\[\#f2ede5\]\/50:hover,
+.dark .hover\:bg-\[\#f2ede5\]\/40:hover {
+  background-color: var(--df-surface-hover) !important;
+}
+
+[data-theme="dark"] .hover\:text-\[\#0a0a0a\]:hover,
+.dark .hover\:text-\[\#0a0a0a\]:hover {
+  color: var(--df-text) !important;
+}
+
+[data-theme="dark"] .hover\:border-\[\#0a0a0a\]:hover,
+.dark .hover\:border-\[\#0a0a0a\]:hover {
+  border-color: var(--df-border-strong) !important;
+}
+
+/* Focus States */
+[data-theme="dark"] .focus\:border-\[\#0a0a0a\]:focus,
+.dark .focus\:border-\[\#0a0a0a\]:focus {
+  border-color: var(--df-border-focus) !important;
+}
+
+[data-theme="dark"] .focus\:bg-white:focus,
+.dark .focus\:bg-white:focus {
+  background-color: var(--df-surface-input) !important;
+}
+
+[data-theme="dark"] .placeholder\:\text-\[\#858585\]::placeholder,
+.dark .placeholder\:\text-\[\#858585\]::placeholder {
+  color: var(--df-text-muted) !important;
+}
+
+[data-theme="dark"] .ring-\[\#0a0a0a\]\/10,
+.dark .ring-\[\#0a0a0a\]\/10 {
+  --tw-ring-color: rgba(242, 237, 229, 0.35) !important;
+}
+
+/* Semantic Badges in Dark Mode (Restrained warm amber and soft rose) */
+[data-theme="dark"] .border-amber-200.bg-amber-50,
+.dark .border-amber-200.bg-amber-50 {
+  border-color: rgba(217, 119, 6, 0.35) !important;
+  background-color: rgba(217, 119, 6, 0.12) !important;
+  color: #fcd34d !important;
+}
+
+[data-theme="dark"] .border-rose-200.bg-rose-50,
+.dark .border-rose-200.bg-rose-50 {
+  border-color: rgba(225, 29, 72, 0.35) !important;
+  background-color: rgba(225, 29, 72, 0.12) !important;
+  color: #fda4af !important;
+}
+
+/* Modals Overlay */
+[data-theme="dark"] .bg-black\/40,
+[data-theme="dark"] .bg-\[\#0a0a0a\]\/40,
+.dark .bg-black\/40,
+.dark .bg-\[\#0a0a0a\]\/40 {
+  background-color: rgba(10, 10, 10, 0.82) !important;
+}
+
+/* Selection & Scrollbars in Dark Mode */
+[data-theme="dark"] ::selection,
+.dark ::selection {
+  background: #f2ede5;
+  color: #0a0a0a;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb,
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--df-border-strong);
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover,
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--df-border-focus);
 }

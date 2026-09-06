@@ -6,6 +6,7 @@ import {
 import type {
   Comment,
   Project,
+  ProjectStatus,
   Team,
   UpdateWorkItemInput,
   WorkItem,
@@ -131,6 +132,46 @@ export const api = {
           name,
           description,
         }),
+      },
+    );
+  },
+
+  async updateProjectStatus(
+    workspaceId: string,
+    projectId: string,
+    status: ProjectStatus,
+  ): Promise<Project> {
+    return apiFetch<Project>(
+      `/api/workspaces/${workspaceId}/projects/${projectId}/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      },
+    );
+  },
+
+  async archiveProject(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<Project> {
+    return this.updateProjectStatus(workspaceId, projectId, "ARCHIVED");
+  },
+
+  async restoreProject(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<Project> {
+    return this.updateProjectStatus(workspaceId, projectId, "ACTIVE");
+  },
+
+  async deleteProject(
+    workspaceId: string,
+    projectId: string,
+  ): Promise<void> {
+    return apiFetch<void>(
+      `/api/workspaces/${workspaceId}/projects/${projectId}`,
+      {
+        method: "DELETE",
       },
     );
   },

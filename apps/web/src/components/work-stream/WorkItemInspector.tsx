@@ -492,15 +492,15 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     : null;
 
   return (
-    <aside className="flex h-full w-full flex-col border-l border-[#d5d9e2] bg-white font-sans text-xs text-[#0a0a0a] select-none">
+    <aside className="flex h-full w-full flex-col border-l border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#111110] font-sans text-xs text-[#0a0a0a] dark:text-white select-none">
       {/* HEADER BAR */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#d5d9e2] bg-white px-5">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#111110] px-5">
         <div className="flex items-center gap-2.5">
-          <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#0a0a0a]">
+          <span className="rounded-md border border-[#d5d9e2] dark:border-white/10 bg-[#f2ede5] dark:bg-[#181716] px-2 py-0.5 text-[10px] font-mono font-bold text-[#0a0a0a] dark:text-white uppercase tracking-wider">
             {item.type || "TASK"}
           </span>
 
-          <span className="text-[11px] font-mono font-bold text-[#858585] tracking-widest uppercase">
+          <span className="text-[9px] font-sans font-semibold tracking-widest text-[#858585] dark:text-[#6e6b66] uppercase">
             INSPECTOR
           </span>
         </div>
@@ -508,7 +508,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-lg text-[#858585] hover:bg-[#f2ede5] hover:text-[#0a0a0a] transition"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-lg leading-none text-[#858585] dark:text-[#78756f] hover:bg-[#f2ede5] dark:hover:bg-[#181716] hover:text-[#0a0a0a] dark:hover:text-white transition duration-150"
           title="Close Inspector (Esc)"
         >
           &times;
@@ -523,12 +523,12 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
       )}
 
       {/* CONTENT SCROLL AREA */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-[#f9f8f6]">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#f9f8f6] dark:bg-[#161514]">
         {/* TOP SECTION: TITLE & DESCRIPTION */}
-        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-4">
+        <div className="rounded-2xl border border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#1a1918] p-4 shadow-xs space-y-3.5">
           {/* TITLE FIELD */}
           <div>
-            <label className="mb-1.5 block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]">
+            <label className="mb-1 block text-[10px] font-sans font-bold uppercase tracking-wider text-[#858585]">
               Title
             </label>
             <input
@@ -540,13 +540,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                 if (e.key === "Enter") handleSaveTitle();
               }}
               disabled={isSavingTitle || isViewer}
-              className="w-full rounded-xl border border-transparent bg-transparent px-2.5 py-1.5 font-sans text-base font-bold tracking-tight text-[#0a0a0a] outline-none transition hover:border-[#d5d9e2] focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60"
+              className="w-full rounded-lg border border-transparent bg-transparent px-2.5 py-1.5 font-sans text-sm font-bold tracking-tight text-[#0a0a0a] outline-none transition duration-150 hover:border-[#d5d9e2] focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60"
             />
           </div>
 
           {/* DESCRIPTION FIELD */}
           <div>
-            <label className="mb-1.5 block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]">
+            <label className="mb-1 block text-[10px] font-sans font-bold uppercase tracking-wider text-[#858585]">
               Description
             </label>
             <textarea
@@ -556,26 +556,26 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               onBlur={handleSaveDescription}
               placeholder="No description provided. Click to add details..."
               disabled={isSavingDesc || isViewer}
-              className="w-full rounded-xl border border-[#d5d9e2] bg-white p-3 font-sans text-xs leading-relaxed text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
+              className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-3 font-sans text-xs leading-relaxed text-[#0a0a0a] placeholder:text-[#858585] outline-none transition duration-150 focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
             />
           </div>
         </div>
 
         {/* PROPERTIES CARD */}
-        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-3.5">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585]">
+        <div className="rounded-2xl border border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#1a1918] p-4 shadow-xs space-y-3">
+          <div className="text-[9px] font-sans font-semibold uppercase tracking-widest text-[#858585] dark:text-[#6e6b66]">
             Properties
           </div>
 
           {/* STATUS ROW */}
-          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-            <span className="text-[11px] font-mono font-semibold text-[#858585]">STATUS</span>
+          <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-sans font-medium text-[#737373]">Status</span>
             {allowedTargetStates.length > 0 && !isViewer ? (
               <select
                 value={item.workflowStateId || ""}
                 disabled={isTransitioningStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white font-sans"
+                className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white font-sans transition duration-150"
               >
                 <option value={item.workflowStateId || ""} disabled>
                   {currentStateObj ? currentStateObj.name : "Select status"}
@@ -587,22 +587,22 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                 ))}
               </select>
             ) : (
-              <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2.5 py-0.5 text-xs text-[#0a0a0a] font-mono font-medium">
+              <span className="rounded-md border border-[#d5d9e2] bg-[#f2ede5] px-2.5 py-0.5 text-xs text-[#0a0a0a] font-mono font-medium">
                 {currentStateObj ? currentStateObj.name : "Unknown"}
               </span>
             )}
           </div>
 
           {/* PRIORITY ROW */}
-          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-            <span className="text-[11px] font-mono font-semibold text-[#858585]">PRIORITY</span>
+          <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-sans font-medium text-[#737373]">Priority</span>
             <select
               value={item.priority || "MEDIUM"}
               disabled={isSavingPriority || isViewer}
               onChange={(e) =>
                 handlePriorityChange(e.target.value as WorkItemPriority)
               }
-              className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
+              className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans transition duration-150"
             >
               {PRIORITY_OPTIONS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -613,16 +613,16 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           </div>
 
           {/* TYPE ROW */}
-          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-            <span className="text-[11px] font-mono font-semibold text-[#858585]">TYPE</span>
-            <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2 py-0.5 text-xs text-[#0a0a0a] font-mono font-bold">
+          <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-sans font-medium text-[#737373]">Type</span>
+            <span className="rounded-md border border-[#d5d9e2] bg-[#f2ede5] px-2 py-0.5 text-xs text-[#0a0a0a] font-mono font-bold uppercase">
               {item.type || "TASK"}
             </span>
           </div>
 
           {/* STORY POINTS ROW (EDITABLE) */}
-          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-            <span className="text-[11px] font-mono font-semibold text-[#858585]">STORY POINTS</span>
+          <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-sans font-medium text-[#737373]">Story points</span>
             <input
               type="number"
               min={0}
@@ -635,20 +635,20 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSaveStoryPoints();
               }}
-              className="w-24 rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-right text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
+              className="w-24 rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-right text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono transition duration-150"
             />
           </div>
 
           {/* ASSIGNEE ROW */}
-          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-            <span className="text-[11px] font-mono font-semibold text-[#858585]">ASSIGNEE</span>
+          <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-sans font-medium text-[#737373]">Assignee</span>
             <select
               value={item.assigneeUserId || ""}
               disabled={isSavingAssignee || isViewer}
               onChange={(e) =>
                 handleAssigneeChange(e.target.value ? e.target.value : null)
               }
-              className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
+              className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans transition duration-150"
             >
               <option value="">Unassigned</option>
               {members.map((m) => (
@@ -666,9 +666,9 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           </div>
 
           {/* TEAM ROW */}
-          <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
+          <div className="flex flex-col py-1.5 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono font-semibold text-[#858585]">TEAM</span>
+              <span className="text-[11px] font-sans font-medium text-[#737373]">Team</span>
               {teams.length === 0 ? (
                 !isCreatingTeam ? (
                   <div className="flex items-center gap-2">
@@ -681,7 +681,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                           setTeamError(null);
                           setIsCreatingTeam(true);
                         }}
-                        className="text-[10px] font-mono font-bold text-[#0a0a0a] hover:underline transition"
+                        className="text-[10px] font-sans font-bold text-[#0a0a0a] hover:underline transition"
                       >
                         + Create team
                       </button>
@@ -696,7 +696,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                     onChange={(e) =>
                       handleTeamChange(e.target.value ? e.target.value : null)
                     }
-                    className="max-w-[150px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
+                    className="max-w-[150px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans transition duration-150"
                   >
                     <option value="">No team</option>
                     {teams.map((t) => (
@@ -720,7 +720,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                         setTeamError(null);
                         setIsCreatingTeam(true);
                       }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d5d9e2] bg-white text-xs font-bold text-[#0a0a0a] hover:bg-[#f2ede5] transition shadow-2xs"
+                      className="flex h-6 w-6 items-center justify-center rounded-md border border-[#d5d9e2] bg-white text-xs font-bold text-[#0a0a0a] hover:bg-[#f2ede5] transition shadow-2xs"
                       title="Create new team"
                     >
                       +
@@ -762,7 +762,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                       setTeamError(null);
                     }}
                     disabled={isSubmittingTeam}
-                    className="rounded-full border border-[#d5d9e2] px-2.5 py-0.5 text-[10px] text-[#858585] hover:text-[#0a0a0a] disabled:opacity-50"
+                    className="rounded-lg border border-[#d5d9e2] px-2.5 py-0.5 text-[10px] font-semibold text-[#858585] hover:text-[#0a0a0a] disabled:opacity-50 transition"
                   >
                     Cancel
                   </button>
@@ -770,7 +770,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                     type="button"
                     onClick={() => void handleCreateTeamSubmit()}
                     disabled={isSubmittingTeam || !newTeamName.trim()}
-                    className="rounded-full bg-[#0a0a0a] px-3 py-0.5 text-[10px] font-semibold text-white hover:bg-[#262626] disabled:opacity-40"
+                    className="rounded-lg bg-[#0a0a0a] px-3 py-0.5 text-[10px] font-bold text-white hover:bg-[#262626] disabled:opacity-40 transition"
                   >
                     {isSubmittingTeam ? "Creating..." : "Create"}
                   </button>
@@ -781,16 +781,16 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
           {/* PARENT ROW */}
           {itemType === "EPIC" ? (
-            <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
-              <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT</span>
+            <div className="flex items-center justify-between py-1.5 border-b border-[#f2ede5] last:border-b-0">
+              <span className="text-[11px] font-sans font-medium text-[#737373]">Parent</span>
               <span className="text-xs text-[#858585] italic font-mono">
                 None (EPIC cannot have parent)
               </span>
             </div>
           ) : itemType === "FEATURE" ? (
-            <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <div className="flex flex-col py-1.5 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT (EPIC)</span>
+                <span className="text-[11px] font-sans font-medium text-[#737373]">Parent (EPIC)</span>
                 <select
                   value={item.parentId || ""}
                   disabled={isSavingParent || isViewer || candidateParents.length === 0}
@@ -799,7 +799,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                       void handleParentChange(e.target.value);
                     }
                   }}
-                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
+                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono transition duration-150"
                 >
                   {!item.parentId && (
                     <option value="" disabled>
@@ -831,7 +831,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectItem(parentItem)}
-                    className="text-[10px] font-mono text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
+                    className="text-[10px] font-sans text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
                     title={`Jump to parent: ${parentItem.title}`}
                   >
                     <span>&uarr; Jump to parent</span>
@@ -843,9 +843,9 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               )}
             </div>
           ) : (
-            <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
+            <div className="flex flex-col py-1.5 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT</span>
+                <span className="text-[11px] font-sans font-medium text-[#737373]">Parent</span>
                 <select
                   value={item.parentId || ""}
                   disabled={isSavingParent || isViewer}
@@ -854,7 +854,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                       e.target.value ? e.target.value : null,
                     )
                   }
-                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
+                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono transition duration-150"
                 >
                   <option value="">Not linked</option>
                   {candidateParents.map((p) => (
@@ -877,7 +877,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   <button
                     type="button"
                     onClick={() => onSelectItem(parentItem)}
-                    className="text-[10px] font-mono text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
+                    className="text-[10px] font-sans text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
                     title={`Jump to parent: ${parentItem.title}`}
                   >
                     <span>&uarr; Jump to parent</span>
@@ -892,15 +892,15 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
         </div>
 
         {/* CHILDREN SECTION */}
-        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-3">
+        <div className="rounded-2xl border border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#1a1918] p-4 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585]">
+            <span className="text-[9px] font-sans font-semibold uppercase tracking-widest text-[#858585] dark:text-[#6e6b66]">
               Children ({directChildren.length})
             </span>
           </div>
 
           {directChildren.length === 0 ? (
-            <p className="text-[11px] text-[#858585] font-sans">No child items linked.</p>
+            <p className="text-[11px] text-[#858585] dark:text-[#78756f] font-sans">No child items linked.</p>
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
               {directChildren.map((child) => {
@@ -911,9 +911,9 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   <div
                     key={child.id}
                     onClick={() => onSelectItem && onSelectItem(child)}
-                    className={`group flex items-center justify-between rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-2.5 transition shadow-xs ${
+                    className={`group flex items-center justify-between rounded-xl border border-[#d5d9e2] dark:border-white/10 bg-[#f9f8f6] dark:bg-[#232220] p-2.5 transition duration-150 shadow-xs ${
                       onSelectItem
-                        ? "cursor-pointer hover:border-[#0a0a0a] hover:bg-white"
+                        ? "cursor-pointer hover:border-[#0a0a0a] dark:hover:border-white/20 hover:bg-white dark:hover:bg-[#282725]"
                         : ""
                     }`}
                     title={
@@ -923,21 +923,21 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                     }
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="shrink-0 rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-1.5 py-0.2 font-mono text-[9px] font-bold text-[#0a0a0a]">
+                      <span className="shrink-0 rounded-md border border-[#d5d9e2] dark:border-white/10 bg-[#f2ede5] dark:bg-[#181716] px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#0a0a0a] dark:text-white uppercase">
                         {child.type || "TASK"}
                       </span>
-                      <span className="truncate text-xs font-medium text-[#0a0a0a] group-hover:text-black transition font-sans">
+                      <span className="truncate text-xs font-semibold text-[#0a0a0a] dark:text-white group-hover:text-black dark:group-hover:text-white transition font-sans">
                         {child.title}
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {childState && (
-                        <span className="rounded-full border border-[#d5d9e2] bg-white px-1.5 py-0.5 font-mono text-[9px] text-[#858585]">
+                        <span className="rounded-md border border-[#d5d9e2] dark:border-white/10 bg-white dark:bg-[#1a1918] px-1.5 py-0.5 font-mono text-[9px] text-[#858585] dark:text-[#78756f]">
                           {childState.name}
                         </span>
                       )}
                       {onSelectItem && (
-                        <span className="text-[10px] text-[#858585] group-hover:text-[#0a0a0a] font-mono font-bold">
+                        <span className="text-[10px] text-[#858585] dark:text-[#78756f] group-hover:text-[#0a0a0a] dark:group-hover:text-white font-mono font-bold">
                           &rarr;
                         </span>
                       )}
@@ -950,13 +950,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
         </div>
 
         {/* COMMENTS & ACTIVITY */}
-        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-4">
-          <div className="flex items-center gap-4 border-b border-[#f2ede5] pb-2">
+        <div className="rounded-2xl border border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#1a1918] p-4 shadow-xs space-y-4">
+          <div className="flex items-center gap-4 border-b border-[#f2ede5] dark:border-white/[0.06] pb-2">
             <button
               type="button"
               onClick={() => setActiveTab("DETAILS")}
-              className={`text-[11px] font-mono font-bold uppercase tracking-wider ${
-                activeTab === "DETAILS" ? "text-[#0a0a0a]" : "text-[#858585]"
+              className={`text-[10px] font-sans font-bold uppercase tracking-wider ${
+                activeTab === "DETAILS" ? "text-[#0a0a0a] dark:text-white" : "text-[#858585] dark:text-[#78756f]"
               }`}
             >
               Activity & Comments
@@ -966,7 +966,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           <div className="space-y-4 font-sans">
             {/* COMMENTS SECTION */}
             <div>
-              <span className="block text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585] mb-2">
+              <span className="block text-[10px] font-sans font-bold uppercase tracking-wider text-[#858585] mb-2">
                 Comments ({comments.length})
               </span>
 
@@ -998,13 +998,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   onChange={(e) => setNewCommentContent(e.target.value)}
                   placeholder="Write a comment..."
                   disabled={isAddingComment || isViewer}
-                  className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3 py-2 font-sans text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
+                  className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3 py-2 font-sans text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition duration-150 focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
                 />
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={isAddingComment || !newCommentContent.trim() || isViewer}
-                    className="rounded-full bg-[#0a0a0a] px-4 py-1.5 text-[10px] font-semibold text-white shadow-xs hover:bg-[#262626] disabled:opacity-40 transition"
+                    className="rounded-lg bg-[#0a0a0a] px-4 py-1.5 text-[10px] font-bold text-white shadow-xs hover:bg-[#262626] disabled:opacity-40 transition duration-150"
                   >
                     {isAddingComment ? "Posting..." : "Comment"}
                   </button>
@@ -1014,7 +1014,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
             {/* HISTORY LOG SECTION */}
             <div className="border-t border-[#f2ede5] pt-3">
-              <span className="block text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585] mb-2">
+              <span className="block text-[10px] font-sans font-bold uppercase tracking-wider text-[#858585] mb-2">
                 History Log ({history.length})
               </span>
 
@@ -1046,7 +1046,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           <button
             type="button"
             onClick={() => onDeleteRequest(item)}
-            className="w-full rounded-full border border-rose-200 bg-white py-2 font-mono text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition shadow-xs"
+            className="w-full rounded-lg border border-rose-200 bg-white py-2 font-sans text-xs font-bold text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition duration-150 shadow-xs"
           >
             Delete Work Item
           </button>

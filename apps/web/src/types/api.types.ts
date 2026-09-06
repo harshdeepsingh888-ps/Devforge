@@ -40,12 +40,14 @@ export interface Team {
   updatedAt?: string;
 }
 
+export type ProjectStatus = "ACTIVE" | "ARCHIVED" | "PAUSED";
+
 export interface Project {
   id: string;
   workspaceId: string;
   name: string;
   description?: string | null;
-  status?: string;
+  status?: ProjectStatus;
   createdAt?: string;
   updatedAt?: string;
 }

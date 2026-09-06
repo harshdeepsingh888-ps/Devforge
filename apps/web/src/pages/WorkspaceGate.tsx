@@ -47,16 +47,16 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
    */
   if (workspaces.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#050706] p-6 text-[#e5e7eb] font-sans">
-        <section className="w-full max-w-md space-y-6 rounded-md border border-[#202622] bg-[#080a09] p-8 shadow-2xl">
+      <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
+        <section className="w-full max-w-md space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-emerald-400 uppercase">
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#858585] uppercase">
               DEVFORGE
             </div>
-            <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#0a0a0a]">
               Create Workspace
             </h1>
-            <p className="mt-1 text-xs text-[#9ca3af]">
+            <p className="mt-1 text-xs text-[#858585]">
               Create your first workspace to start using DevForge.
             </p>
           </div>
@@ -65,7 +65,7 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
             <div>
               <label
                 htmlFor="workspace-name"
-                className="block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#8d99a8]"
+                className="block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]"
               >
                 Workspace name *
               </label>
@@ -83,14 +83,14 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
                 autoComplete="off"
                 autoFocus
                 disabled={isSubmitting}
-                className="mt-1.5 w-full rounded border border-[#202622] bg-[#050706] px-3.5 py-2 text-xs text-white placeholder:text-[#525d6b] outline-none transition focus:border-emerald-400 font-mono"
+                className="mt-1.5 w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 font-sans"
               />
             </div>
 
             {error && (
               <div
                 role="alert"
-                className="rounded border border-red-500/40 bg-red-500/10 p-3 font-mono text-xs text-red-300"
+                className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 font-sans"
               >
                 {error}
               </div>
@@ -99,7 +99,7 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="w-full rounded bg-emerald-400 px-4 py-2 font-mono text-xs font-bold text-[#07110d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="w-full rounded-full bg-[#0a0a0a] px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#262626] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? "Creating..." : "Create Workspace"}
             </button>
@@ -113,16 +113,16 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
    * WORKSPACES EXIST: SELECT WORKSPACE
    */
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#050706] p-6 text-[#e5e7eb] font-sans">
-      <section className="w-full max-w-lg space-y-6 rounded-md border border-[#202622] bg-[#080a09] p-8 shadow-2xl">
+    <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
+      <section className="w-full max-w-lg space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
         <div>
-          <div className="text-[10px] font-mono font-bold tracking-widest text-emerald-400 uppercase">
+          <div className="text-[10px] font-mono font-bold tracking-widest text-[#858585] uppercase">
             DEVFORGE
           </div>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-[#0a0a0a]">
             Select Workspace
           </h1>
-          <p className="mt-1 text-xs text-[#9ca3af]">
+          <p className="mt-1 text-xs text-[#858585]">
             Choose the workspace you want to open.
           </p>
         </div>
@@ -133,18 +133,18 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
               key={workspace.id}
               type="button"
               onClick={() => onSelectWorkspace(workspace)}
-              className="flex w-full items-center justify-between rounded border border-[#202622] bg-[#0b0f0d] px-4 py-3 text-left transition hover:border-emerald-500/50 hover:bg-[#101512]"
+              className="flex w-full items-center justify-between rounded-xl border border-[#d5d9e2] bg-white px-4 py-3 text-left transition hover:border-[#0a0a0a] hover:bg-[#f2ede5]/40 shadow-xs"
             >
-              <span className="font-semibold text-sm text-white">
+              <span className="font-semibold text-sm text-[#0a0a0a]">
                 {workspace.name}
               </span>
-              <span className="font-mono text-xs text-emerald-400">Open &rarr;</span>
+              <span className="font-mono text-xs text-[#858585]">Open &rarr;</span>
             </button>
           ))}
         </div>
 
-        <div className="border-t border-[#161a18] pt-6">
-          <h2 className="text-xs font-semibold text-white font-mono uppercase tracking-wider">
+        <div className="border-t border-[#d5d9e2] pt-6">
+          <h2 className="text-xs font-semibold text-[#0a0a0a] font-mono uppercase tracking-wider">
             Create another workspace
           </h2>
 
@@ -159,13 +159,13 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
               placeholder="Workspace name"
               autoComplete="off"
               disabled={isSubmitting}
-              className="w-full rounded border border-[#202622] bg-[#050706] px-3.5 py-2 text-xs text-white placeholder:text-[#525d6b] outline-none transition focus:border-emerald-400 font-mono"
+              className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 font-sans"
             />
 
             {error && (
               <div
                 role="alert"
-                className="rounded border border-red-500/40 bg-red-500/10 p-3 font-mono text-xs text-red-300"
+                className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 font-sans"
               >
                 {error}
               </div>
@@ -174,7 +174,7 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
             <button
               type="submit"
               disabled={isSubmitting || !name.trim()}
-              className="rounded bg-emerald-400 px-4 py-2 font-mono text-xs font-bold text-[#07110d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-[#0a0a0a] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#262626] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? "Creating..." : "Create Workspace"}
             </button>

@@ -45,16 +45,16 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#050706] p-6 text-[#e5e7eb] font-sans">
-      <section className="w-full max-w-lg space-y-6 rounded-md border border-[#202622] bg-[#080a09] p-8 shadow-2xl">
+    <main className="flex min-h-screen items-center justify-center bg-[#ffffff] p-6 text-[#0a0a0a] font-sans select-none">
+      <section className="w-full max-w-lg space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
         <div>
-          <span className="font-mono text-[10px] font-semibold text-[#6b7280] uppercase tracking-wider">
+          <span className="font-mono text-[10px] font-semibold text-[#858585] uppercase tracking-wider">
             Workspace: {workspace.name}
           </span>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#0a0a0a]">
             {projects.length === 0 ? "Create Project" : "Select Project"}
           </h1>
-          <p className="mt-1 text-xs text-[#9ca3af]">
+          <p className="mt-1 text-xs text-[#858585]">
             {projects.length === 0
               ? "Projects organize engineering work inside this workspace."
               : "Select a project to open its Work Stream."}
@@ -68,22 +68,22 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
                 key={project.id}
                 type="button"
                 onClick={() => onSelectProject(project)}
-                className="flex w-full items-center justify-between rounded border border-[#202622] bg-[#0b0f0d] px-4 py-3 text-left transition hover:border-emerald-500/50 hover:bg-[#101512]"
+                className="flex w-full items-center justify-between rounded-xl border border-[#d5d9e2] bg-white px-4 py-3 text-left transition hover:border-[#0a0a0a] hover:bg-[#f2ede5]/40 shadow-xs"
               >
-                <span className="font-semibold text-sm text-white">
+                <span className="font-semibold text-sm text-[#0a0a0a]">
                   {project.name}
                 </span>
-                <span className="font-mono text-xs text-emerald-400">Open &rarr;</span>
+                <span className="font-mono text-xs text-[#858585]">Open &rarr;</span>
               </button>
             ))}
           </div>
         )}
 
-        <form onSubmit={handleCreate} className="border-t border-[#161a18] pt-6 space-y-4">
+        <form onSubmit={handleCreate} className="border-t border-[#d5d9e2] pt-6 space-y-4">
           <div>
             <label
               htmlFor="project-name"
-              className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#8d99a8]"
+              className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#858585]"
             >
               {projects.length === 0 ? "Project name *" : "Create another project"}
             </label>
@@ -101,14 +101,14 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
               autoComplete="off"
               autoFocus={projects.length === 0}
               disabled={isSubmitting}
-              className="mt-1.5 w-full rounded border border-[#202622] bg-[#050706] px-3.5 py-2 text-xs text-white placeholder:text-[#525d6b] outline-none transition focus:border-emerald-400 font-mono"
+              className="mt-1.5 w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 font-sans"
             />
           </div>
 
           {error && (
             <div
               role="alert"
-              className="rounded border border-red-500/40 bg-red-500/10 p-3 font-mono text-xs text-red-300"
+              className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 font-sans"
             >
               {error}
             </div>
@@ -117,7 +117,7 @@ export const ProjectGate: React.FC<ProjectGateProps> = ({
           <button
             type="submit"
             disabled={isSubmitting || !name.trim()}
-            className="w-full rounded bg-emerald-400 px-4 py-2 font-mono text-xs font-bold text-[#07110d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-full bg-[#0a0a0a] px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#262626] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? "Creating..." : "Create Project"}
           </button>

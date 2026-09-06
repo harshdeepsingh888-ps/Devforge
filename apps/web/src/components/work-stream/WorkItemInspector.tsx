@@ -25,6 +25,7 @@ interface WorkItemInspectorProps {
   onTransitionState: (item: WorkItem, targetStateId: string) => Promise<void>;
   onDeleteRequest: (item: WorkItem) => void;
   onTeamCreated?: (team: Team) => void;
+  onSelectItem?: (item: WorkItem) => void;
 }
 
 const PRIORITY_OPTIONS: {
@@ -35,22 +36,22 @@ const PRIORITY_OPTIONS: {
   {
     value: "LOW",
     label: "Low",
-    badgeClass: "border-slate-600/40 bg-slate-800/30 text-slate-400",
+    badgeClass: "border-[#d5d9e2] bg-[#f9f8f6] text-[#737373]",
   },
   {
     value: "MEDIUM",
     label: "Medium",
-    badgeClass: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+    badgeClass: "border-[#d5d9e2] bg-[#f9f8f6] text-[#171717] font-semibold",
   },
   {
     value: "HIGH",
     label: "High",
-    badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+    badgeClass: "border-amber-200 bg-amber-50 text-amber-900 font-bold",
   },
   {
     value: "URGENT",
     label: "Urgent",
-    badgeClass: "border-rose-500/30 bg-rose-500/10 text-rose-300",
+    badgeClass: "border-rose-200 bg-rose-50 text-rose-900 font-bold",
   },
 ];
 
@@ -67,6 +68,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   onTransitionState,
   onDeleteRequest,
   onTeamCreated,
+  onSelectItem,
 }) => {
   // EDITABLE STATE
   const [title, setTitle] = useState(item.title);
@@ -81,6 +83,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
   const [isSavingStoryPoints, setIsSavingStoryPoints] = useState(false);
   const [isSavingAssignee, setIsSavingAssignee] = useState(false);
   const [isSavingTeam, setIsSavingTeam] = useState(false);
+  const [isSavingParent, setIsSavingParent] = useState(false);
   const [isTransitioningStatus, setIsTransitioningStatus] = useState(false);
 
   // INLINE TEAM CREATION STATE
@@ -325,7 +328,37 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
     }
   };
 
-  // CREATE TEAM SUBMIT & AUTO-ASSIGNMENT (STEP 5 & STEP 6)
+  // PARENT CHANGE
+  const handleParentChange = async (newParentId: string | null) => {
+    if (
+      newParentId === (item.parentId || null) ||
+      isSavingParent ||
+      isViewer
+    ) {
+      return;
+    }
+
+    setIsSavingParent(true);
+    setError(null);
+
+    try {
+      const updated = await api.updateWorkItem(
+        workspace.id,
+        item.id,
+        { parentId: newParentId },
+        project.id,
+      );
+      onItemUpdated(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update parent work item.",
+      );
+    } finally {
+      setIsSavingParent(false);
+    }
+  };
+
+  // CREATE TEAM SUBMIT & AUTO-ASSIGNMENT
   const handleCreateTeamSubmit = async () => {
     const trimmedName = newTeamName.trim();
     if (!trimmedName || isSubmittingTeam || !canCreateTeam) return;
@@ -422,20 +455,52 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
       )
     : [];
 
+  const itemType = (item.type || "TASK").toUpperCase();
+
+  // Filter valid candidate parents from the current project, excluding self
+  const potentialParents = allItems.filter(
+    (candidate) =>
+      candidate.id !== item.id &&
+      (!candidate.projectId || candidate.projectId === project.id),
+  );
+
+  let candidateParents: WorkItem[] = [];
+  if (itemType === "EPIC") {
+    // EPIC cannot have a parent
+    candidateParents = [];
+  } else if (itemType === "FEATURE") {
+    // FEATURE must have an EPIC parent
+    candidateParents = potentialParents.filter(
+      (c) => (c.type || "TASK").toUpperCase() === "EPIC",
+    );
+  } else {
+    // TASK or BUG can have EPIC or FEATURE parent
+    candidateParents = potentialParents.filter((c) => {
+      const t = (c.type || "TASK").toUpperCase();
+      return t === "EPIC" || t === "FEATURE";
+    });
+  }
+
+  const directChildren = allItems.filter(
+    (candidate) =>
+      candidate.parentId === item.id &&
+      (!candidate.projectId || candidate.projectId === project.id),
+  );
+
   const parentItem = item.parentId
     ? allItems.find((i) => i.id === item.parentId)
     : null;
 
   return (
-    <aside className="flex h-full w-full flex-col border-l border-[#161a18] bg-[#080a09] font-mono text-xs text-[#e5e7eb] select-none">
+    <aside className="flex h-full w-full flex-col border-l border-[#d5d9e2] bg-white font-sans text-xs text-[#0a0a0a] select-none">
       {/* HEADER BAR */}
-      <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#161a18] px-4">
-        <div className="flex items-center gap-2">
-          <span className="rounded border border-[#202622] bg-[#0b0f0d] px-1.5 py-0.5 text-[10px] font-bold text-[#9ca3af]">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#d5d9e2] bg-white px-5">
+        <div className="flex items-center gap-2.5">
+          <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#0a0a0a]">
             {item.type || "TASK"}
           </span>
 
-          <span className="text-[10px] text-[#6b7280]">
+          <span className="text-[11px] font-mono font-bold text-[#858585] tracking-widest uppercase">
             INSPECTOR
           </span>
         </div>
@@ -443,71 +508,74 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="rounded p-1 text-base text-[#9ca3af] hover:bg-[#161a18] hover:text-white"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-lg text-[#858585] hover:bg-[#f2ede5] hover:text-[#0a0a0a] transition"
           title="Close Inspector (Esc)"
         >
-          ×
+          &times;
         </button>
       </div>
 
       {/* ERROR NOTIFICATION */}
       {error && (
-        <div className="m-3 rounded border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-300">
+        <div className="m-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 font-sans">
           {error}
         </div>
       )}
 
       {/* CONTENT SCROLL AREA */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* TITLE FIELD */}
-        <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7280]">
-            Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleSaveTitle}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSaveTitle();
-            }}
-            disabled={isSavingTitle || isViewer}
-            className="w-full rounded border border-transparent bg-transparent font-sans text-sm font-semibold text-white outline-none transition hover:border-[#202622] focus:border-emerald-500 focus:bg-[#050706] focus:px-2 focus:py-1 disabled:opacity-60"
-          />
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 bg-[#f9f8f6]">
+        {/* TOP SECTION: TITLE & DESCRIPTION */}
+        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-4">
+          {/* TITLE FIELD */}
+          <div>
+            <label className="mb-1.5 block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]">
+              Title
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={handleSaveTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveTitle();
+              }}
+              disabled={isSavingTitle || isViewer}
+              className="w-full rounded-xl border border-transparent bg-transparent px-2.5 py-1.5 font-sans text-base font-bold tracking-tight text-[#0a0a0a] outline-none transition hover:border-[#d5d9e2] focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60"
+            />
+          </div>
+
+          {/* DESCRIPTION FIELD */}
+          <div>
+            <label className="mb-1.5 block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]">
+              Description
+            </label>
+            <textarea
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={handleSaveDescription}
+              placeholder="No description provided. Click to add details..."
+              disabled={isSavingDesc || isViewer}
+              className="w-full rounded-xl border border-[#d5d9e2] bg-white p-3 font-sans text-xs leading-relaxed text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
+            />
+          </div>
         </div>
 
-        {/* DESCRIPTION FIELD */}
-        <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7280]">
-            Description
-          </label>
-          <textarea
-            rows={3}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={handleSaveDescription}
-            placeholder="No description provided. Click to add details..."
-            disabled={isSavingDesc || isViewer}
-            className="w-full rounded border border-[#202622] bg-[#050706] p-2.5 font-sans text-xs text-[#e5e7eb] placeholder:text-[#525d6b] outline-none transition focus:border-emerald-500 disabled:opacity-60"
-          />
-        </div>
-
-        {/* METADATA GRID / TABLE */}
-        <div className="border-t border-[#161a18] pt-4 space-y-3">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-[#6b7280]">
+        {/* PROPERTIES CARD */}
+        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-3.5">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585]">
             Properties
           </div>
 
           {/* STATUS ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">STATUS</span>
+          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-mono font-semibold text-[#858585]">STATUS</span>
             {allowedTargetStates.length > 0 && !isViewer ? (
               <select
                 value={item.workflowStateId || ""}
                 disabled={isTransitioningStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
-                className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500"
+                className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white font-sans"
               >
                 <option value={item.workflowStateId || ""} disabled>
                   {currentStateObj ? currentStateObj.name : "Select status"}
@@ -519,22 +587,22 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                 ))}
               </select>
             ) : (
-              <span className="rounded border border-[#202622] bg-[#0b0f0d] px-2 py-0.5 text-xs text-white">
+              <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2.5 py-0.5 text-xs text-[#0a0a0a] font-mono font-medium">
                 {currentStateObj ? currentStateObj.name : "Unknown"}
               </span>
             )}
           </div>
 
           {/* PRIORITY ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">PRIORITY</span>
+          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-mono font-semibold text-[#858585]">PRIORITY</span>
             <select
               value={item.priority || "MEDIUM"}
               disabled={isSavingPriority || isViewer}
               onChange={(e) =>
                 handlePriorityChange(e.target.value as WorkItemPriority)
               }
-              className="rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+              className="rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
             >
               {PRIORITY_OPTIONS.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -545,14 +613,16 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           </div>
 
           {/* TYPE ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">TYPE</span>
-            <span className="text-xs text-white">{item.type || "TASK"}</span>
+          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-mono font-semibold text-[#858585]">TYPE</span>
+            <span className="rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-2 py-0.5 text-xs text-[#0a0a0a] font-mono font-bold">
+              {item.type || "TASK"}
+            </span>
           </div>
 
           {/* STORY POINTS ROW (EDITABLE) */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">STORY POINTS</span>
+          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-mono font-semibold text-[#858585]">STORY POINTS</span>
             <input
               type="number"
               min={0}
@@ -565,20 +635,20 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSaveStoryPoints();
               }}
-              className="w-24 rounded border border-[#202622] bg-[#050706] px-2 py-0.5 text-right text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60"
+              className="w-24 rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-right text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
             />
           </div>
 
           {/* ASSIGNEE ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">ASSIGNEE</span>
+          <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+            <span className="text-[11px] font-mono font-semibold text-[#858585]">ASSIGNEE</span>
             <select
               value={item.assigneeUserId || ""}
               disabled={isSavingAssignee || isViewer}
               onChange={(e) =>
                 handleAssigneeChange(e.target.value ? e.target.value : null)
               }
-              className="max-w-[180px] truncate rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+              className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
             >
               <option value="">Unassigned</option>
               {members.map((m) => (
@@ -595,14 +665,14 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             </select>
           </div>
 
-          {/* TEAM ROW (ZERO-TEAM & MULTI-TEAM CREATION UX) */}
-          <div className="flex flex-col py-1 gap-1">
+          {/* TEAM ROW */}
+          <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[#9ca3af]">TEAM</span>
+              <span className="text-[11px] font-mono font-semibold text-[#858585]">TEAM</span>
               {teams.length === 0 ? (
                 !isCreatingTeam ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-[#6b7280]">No teams yet</span>
+                    <span className="text-xs text-[#858585] font-sans">No teams yet</span>
                     {canCreateTeam && (
                       <button
                         type="button"
@@ -611,7 +681,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                           setTeamError(null);
                           setIsCreatingTeam(true);
                         }}
-                        className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 transition"
+                        className="text-[10px] font-mono font-bold text-[#0a0a0a] hover:underline transition"
                       >
                         + Create team
                       </button>
@@ -626,7 +696,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                     onChange={(e) =>
                       handleTeamChange(e.target.value ? e.target.value : null)
                     }
-                    className="max-w-[150px] truncate rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                    className="max-w-[150px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-sans"
                   >
                     <option value="">No team</option>
                     {teams.map((t) => (
@@ -650,7 +720,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                         setTeamError(null);
                         setIsCreatingTeam(true);
                       }}
-                      className="rounded border border-[#202622] bg-[#050706] px-1.5 py-1 text-[11px] font-bold text-emerald-400 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition"
+                      className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d5d9e2] bg-white text-xs font-bold text-[#0a0a0a] hover:bg-[#f2ede5] transition shadow-2xs"
                       title="Create new team"
                     >
                       +
@@ -662,7 +732,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
             {/* INLINE TEAM CREATION FORM */}
             {isCreatingTeam && (
-              <div className="mt-1 space-y-1.5 rounded border border-[#202622] bg-[#050706] p-2">
+              <div className="mt-1 space-y-2 rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-3 shadow-xs">
                 <input
                   type="text"
                   value={newTeamName}
@@ -679,12 +749,12 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   placeholder="Team name..."
                   disabled={isSubmittingTeam}
                   autoFocus
-                  className="w-full rounded border border-[#202622] bg-[#080a09] px-2 py-1 text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60 font-sans"
+                  className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3 py-1.5 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none focus:border-[#0a0a0a] disabled:opacity-60 font-sans"
                 />
                 {teamError && (
-                  <p className="text-[10px] font-medium text-red-400">{teamError}</p>
+                  <p className="text-[10px] font-medium text-rose-700 font-sans">{teamError}</p>
                 )}
-                <div className="flex items-center justify-end gap-1.5">
+                <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -692,7 +762,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                       setTeamError(null);
                     }}
                     disabled={isSubmittingTeam}
-                    className="rounded px-2 py-0.5 text-[10px] text-[#9ca3af] hover:text-white disabled:opacity-50"
+                    className="rounded-full border border-[#d5d9e2] px-2.5 py-0.5 text-[10px] text-[#858585] hover:text-[#0a0a0a] disabled:opacity-50"
                   >
                     Cancel
                   </button>
@@ -700,7 +770,7 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                     type="button"
                     onClick={() => void handleCreateTeamSubmit()}
                     disabled={isSubmittingTeam || !newTeamName.trim()}
-                    className="rounded bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
+                    className="rounded-full bg-[#0a0a0a] px-3 py-0.5 text-[10px] font-semibold text-white hover:bg-[#262626] disabled:opacity-40"
                   >
                     {isSubmittingTeam ? "Creating..." : "Create"}
                   </button>
@@ -710,48 +780,209 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
           </div>
 
           {/* PARENT ROW */}
-          <div className="flex items-center justify-between py-1">
-            <span className="text-[11px] text-[#9ca3af]">PARENT</span>
-            <span className="truncate max-w-[180px] text-xs text-white">
-              {parentItem ? parentItem.title : "Not linked"}
-            </span>
-          </div>
+          {itemType === "EPIC" ? (
+            <div className="flex items-center justify-between py-1 border-b border-[#f2ede5] last:border-b-0">
+              <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT</span>
+              <span className="text-xs text-[#858585] italic font-mono">
+                None (EPIC cannot have parent)
+              </span>
+            </div>
+          ) : itemType === "FEATURE" ? (
+            <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT (EPIC)</span>
+                <select
+                  value={item.parentId || ""}
+                  disabled={isSavingParent || isViewer || candidateParents.length === 0}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      void handleParentChange(e.target.value);
+                    }
+                  }}
+                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
+                >
+                  {!item.parentId && (
+                    <option value="" disabled>
+                      Select parent Epic...
+                    </option>
+                  )}
+                  {candidateParents.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.type || "EPIC"}] {p.title}
+                    </option>
+                  ))}
+                  {item.parentId &&
+                    !candidateParents.some((p) => p.id === item.parentId) && (
+                      <option value={item.parentId} disabled>
+                        {parentItem
+                          ? `[${parentItem.type || "EPIC"}] ${parentItem.title}`
+                          : "Unknown parent"}
+                      </option>
+                    )}
+                </select>
+              </div>
+              {candidateParents.length === 0 && !item.parentId && (
+                <p className="text-[10px] text-amber-700 font-sans">
+                  No Epics available in this project.
+                </p>
+              )}
+              {parentItem && onSelectItem && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onSelectItem(parentItem)}
+                    className="text-[10px] font-mono text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
+                    title={`Jump to parent: ${parentItem.title}`}
+                  >
+                    <span>&uarr; Jump to parent</span>
+                    <span className="max-w-[120px] truncate text-[#858585]">
+                      ({parentItem.title})
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col py-1 gap-1.5 border-b border-[#f2ede5] last:border-b-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono font-semibold text-[#858585]">PARENT</span>
+                <select
+                  value={item.parentId || ""}
+                  disabled={isSavingParent || isViewer}
+                  onChange={(e) =>
+                    void handleParentChange(
+                      e.target.value ? e.target.value : null,
+                    )
+                  }
+                  className="max-w-[180px] truncate rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1 text-xs text-[#0a0a0a] font-medium outline-none focus:border-[#0a0a0a] focus:bg-white disabled:opacity-60 font-mono"
+                >
+                  <option value="">Not linked</option>
+                  {candidateParents.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.type || "ITEM"}] {p.title}
+                    </option>
+                  ))}
+                  {item.parentId &&
+                    !candidateParents.some((p) => p.id === item.parentId) && (
+                      <option value={item.parentId} disabled>
+                        {parentItem
+                          ? `[${parentItem.type || "ITEM"}] ${parentItem.title}`
+                          : "Unknown parent"}
+                      </option>
+                    )}
+                </select>
+              </div>
+              {parentItem && onSelectItem && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onSelectItem(parentItem)}
+                    className="text-[10px] font-mono text-[#0a0a0a] font-bold hover:underline transition flex items-center gap-1.5"
+                    title={`Jump to parent: ${parentItem.title}`}
+                  >
+                    <span>&uarr; Jump to parent</span>
+                    <span className="max-w-[120px] truncate text-[#858585]">
+                      ({parentItem.title})
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* COMMENTS & HISTORY */}
-        <div className="border-t border-[#161a18] pt-4">
-          <div className="flex items-center gap-4 border-b border-[#161a18] pb-2">
+        {/* CHILDREN SECTION */}
+        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585]">
+              Children ({directChildren.length})
+            </span>
+          </div>
+
+          {directChildren.length === 0 ? (
+            <p className="text-[11px] text-[#858585] font-sans">No child items linked.</p>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {directChildren.map((child) => {
+                const childState = workflowDetails?.states.find(
+                  (s) => s.id === child.workflowStateId,
+                );
+                return (
+                  <div
+                    key={child.id}
+                    onClick={() => onSelectItem && onSelectItem(child)}
+                    className={`group flex items-center justify-between rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-2.5 transition shadow-xs ${
+                      onSelectItem
+                        ? "cursor-pointer hover:border-[#0a0a0a] hover:bg-white"
+                        : ""
+                    }`}
+                    title={
+                      onSelectItem
+                        ? `Click to inspect ${child.title}`
+                        : undefined
+                    }
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="shrink-0 rounded-full border border-[#d5d9e2] bg-[#f2ede5] px-1.5 py-0.2 font-mono text-[9px] font-bold text-[#0a0a0a]">
+                        {child.type || "TASK"}
+                      </span>
+                      <span className="truncate text-xs font-medium text-[#0a0a0a] group-hover:text-black transition font-sans">
+                        {child.title}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {childState && (
+                        <span className="rounded-full border border-[#d5d9e2] bg-white px-1.5 py-0.5 font-mono text-[9px] text-[#858585]">
+                          {childState.name}
+                        </span>
+                      )}
+                      {onSelectItem && (
+                        <span className="text-[10px] text-[#858585] group-hover:text-[#0a0a0a] font-mono font-bold">
+                          &rarr;
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* COMMENTS & ACTIVITY */}
+        <div className="rounded-2xl border border-[#d5d9e2] bg-white p-4 shadow-xs space-y-4">
+          <div className="flex items-center gap-4 border-b border-[#f2ede5] pb-2">
             <button
               type="button"
               onClick={() => setActiveTab("DETAILS")}
-              className={`text-[11px] font-bold ${
-                activeTab === "DETAILS" ? "text-emerald-400" : "text-[#6b7280]"
+              className={`text-[11px] font-mono font-bold uppercase tracking-wider ${
+                activeTab === "DETAILS" ? "text-[#0a0a0a]" : "text-[#858585]"
               }`}
             >
               Activity & Comments
             </button>
           </div>
 
-          <div className="mt-3 space-y-4">
+          <div className="space-y-4 font-sans">
             {/* COMMENTS SECTION */}
             <div>
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#6b7280] mb-2">
+              <span className="block text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585] mb-2">
                 Comments ({comments.length})
               </span>
 
               {isLoadingComments ? (
-                <p className="text-[11px] text-[#6b7280]">Loading comments...</p>
+                <p className="text-[11px] text-[#858585]">Loading comments...</p>
               ) : comments.length === 0 ? (
-                <p className="text-[11px] text-[#6b7280]">No comments yet.</p>
+                <p className="text-[11px] text-[#858585]">No comments yet.</p>
               ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {comments.map((c) => (
                     <div
                       key={c.id}
-                      className="rounded border border-[#202622] bg-[#050706] p-2.5 font-sans"
+                      className="rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-3 font-sans shadow-xs"
                     >
-                      <p className="text-xs text-[#e5e7eb]">{c.content}</p>
-                      <span className="mt-1 block font-mono text-[9px] text-[#6b7280]">
+                      <p className="text-xs text-[#0a0a0a] leading-relaxed">{c.content}</p>
+                      <span className="mt-1.5 block font-mono text-[9px] text-[#858585]">
                         {new Date(c.createdAt).toLocaleString()}
                       </span>
                     </div>
@@ -767,13 +998,13 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
                   onChange={(e) => setNewCommentContent(e.target.value)}
                   placeholder="Write a comment..."
                   disabled={isAddingComment || isViewer}
-                  className="w-full rounded border border-[#202622] bg-[#050706] px-2.5 py-1.5 font-sans text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500 disabled:opacity-60"
+                  className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3 py-2 font-sans text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60"
                 />
                 <div className="flex justify-end">
                   <button
                     type="submit"
                     disabled={isAddingComment || !newCommentContent.trim() || isViewer}
-                    className="rounded bg-emerald-500 px-3 py-1 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
+                    className="rounded-full bg-[#0a0a0a] px-4 py-1.5 text-[10px] font-semibold text-white shadow-xs hover:bg-[#262626] disabled:opacity-40 transition"
                   >
                     {isAddingComment ? "Posting..." : "Comment"}
                   </button>
@@ -782,23 +1013,23 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
             </div>
 
             {/* HISTORY LOG SECTION */}
-            <div className="border-t border-[#161a18] pt-3">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#6b7280] mb-2">
+            <div className="border-t border-[#f2ede5] pt-3">
+              <span className="block text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585] mb-2">
                 History Log ({history.length})
               </span>
 
               {isLoadingHistory ? (
-                <p className="text-[11px] text-[#6b7280]">Loading history...</p>
+                <p className="text-[11px] text-[#858585]">Loading history...</p>
               ) : history.length === 0 ? (
-                <p className="text-[11px] text-[#6b7280]">No history recorded.</p>
+                <p className="text-[11px] text-[#858585]">No history recorded.</p>
               ) : (
                 <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                   {history.map((h) => (
                     <div
                       key={h.id}
-                      className="flex items-center justify-between text-[10px] text-[#9ca3af] py-0.5 border-b border-[#161a18] last:border-b-0"
+                      className="flex items-center justify-between text-[10px] text-[#858585] py-1 border-b border-[#f2ede5] last:border-b-0 font-mono"
                     >
-                      <span className="font-semibold text-white">{h.action}</span>
+                      <span className="font-semibold text-[#0a0a0a]">{h.action}</span>
                       <span>{new Date(h.createdAt).toLocaleDateString()}</span>
                     </div>
                   ))}
@@ -811,11 +1042,11 @@ export const WorkItemInspector: React.FC<WorkItemInspectorProps> = ({
 
       {/* DANGER ZONE / DELETE BUTTON */}
       {!isViewer && (
-        <div className="border-t border-[#161a18] p-3">
+        <div className="border-t border-[#d5d9e2] bg-white p-4">
           <button
             type="button"
             onClick={() => onDeleteRequest(item)}
-            className="w-full rounded border border-rose-500/40 bg-rose-500/10 py-1.5 font-mono text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition"
+            className="w-full rounded-full border border-rose-200 bg-white py-2 font-mono text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:border-rose-300 transition shadow-xs"
           >
             Delete Work Item
           </button>

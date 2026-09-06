@@ -343,7 +343,7 @@ export const App: React.FC = () => {
    */
   if (isLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#050706] font-mono text-xs text-emerald-400">
+      <div className="flex h-screen w-screen items-center justify-center bg-[#ffffff] font-mono text-xs text-[#858585]">
         Loading...
       </div>
     );
@@ -357,13 +357,13 @@ export const App: React.FC = () => {
    */
   if (error) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#050706] p-4 font-mono text-xs">
-        <div className="w-full max-w-md space-y-4 border border-rose-500/30 bg-[#080a09] p-6">
-          <div className="font-bold text-rose-400">
+      <div className="flex h-screen w-screen items-center justify-center bg-[#ffffff] p-4 font-sans text-xs select-none">
+        <div className="w-full max-w-md space-y-4 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-6 shadow-sm">
+          <div className="font-bold text-rose-700 text-sm font-mono uppercase tracking-wider">
             DevForge could not load
           </div>
 
-          <div className="text-zinc-400">
+          <div className="text-[#858585]">
             {error}
           </div>
 
@@ -372,7 +372,7 @@ export const App: React.FC = () => {
             onClick={() => {
               void loadWorkspaces();
             }}
-            className="bg-emerald-500 px-4 py-2 font-bold text-black transition-colors hover:bg-emerald-600"
+            className="rounded-full bg-[#0a0a0a] px-5 py-2 font-semibold text-white transition hover:bg-[#262626] shadow-xs"
           >
             Retry
           </button>

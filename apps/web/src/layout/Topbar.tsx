@@ -15,34 +15,34 @@ export const Topbar: React.FC<TopbarProps> = ({
   onToggleMobileSidebar,
 }) => {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between border-b border-[#161a18] bg-[#080a09] px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between border-b border-[#d5d9e2] bg-white px-4 md:px-6">
       {/* LEFT: BREADCRUMB */}
-      <div className="flex min-w-0 items-center gap-2 text-xs font-medium">
+      <div className="flex min-w-0 items-center gap-2 text-xs font-sans">
         {onToggleMobileSidebar && (
           <button
             type="button"
             onClick={onToggleMobileSidebar}
-            className="mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded border border-[#202622] text-[#9ca3af] hover:border-emerald-500/50 hover:text-white md:hidden"
+            className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] md:hidden shadow-xs"
             aria-label="Open sidebar"
           >
             ☰
           </button>
         )}
 
-        <span className="truncate text-[#9ca3af]">
+        <span className="truncate font-medium text-[#737373]">
           {workspace.name}
         </span>
 
-        <span className="text-[#3b4740] font-normal">/</span>
+        <span className="text-[#d5d9e2] font-light">/</span>
 
-        <span className="truncate text-white font-semibold">
+        <span className="truncate font-bold text-[#0a0a0a]">
           {project.name}
         </span>
 
-        <span className="text-[#3b4740] font-normal">/</span>
+        <span className="text-[#d5d9e2] font-light">/</span>
 
-        <span className="truncate text-[#6b7280]">
-          Work Stream
+        <span className="rounded-full border border-[#d5d9e2] bg-[#f9f8f6] px-2 py-0.5 text-[10px] font-mono font-medium text-[#737373]">
+          WORK STREAM
         </span>
       </div>
 
@@ -51,7 +51,7 @@ export const Topbar: React.FC<TopbarProps> = ({
         <button
           type="button"
           onClick={onSwitchWorkspace}
-          className="rounded border border-[#202622] bg-[#0b0f0d] px-2.5 py-1 text-xs font-medium text-[#9ca3af] transition hover:border-emerald-500/50 hover:text-white"
+          className="rounded-full border border-[#d5d9e2] bg-white px-3.5 py-1 text-xs font-medium text-[#0a0a0a] transition hover:border-[#0a0a0a] hover:bg-[#f9f8f6] shadow-xs"
         >
           Switch workspace
         </button>

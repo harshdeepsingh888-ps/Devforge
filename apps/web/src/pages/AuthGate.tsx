@@ -60,28 +60,31 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[#050706] p-4 font-mono text-xs">
-      <div className="w-full max-w-md space-y-5 border border-[#161a18] bg-[#080a09] p-6">
+    <div className="fixed inset-0 flex items-center justify-center bg-[#ffffff] p-4 font-sans text-xs select-none">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border border-[#d5d9e2] bg-[#f9f8f6] p-8 shadow-sm">
         <div className="space-y-1">
-          <h1 className="text-base font-bold uppercase tracking-wider text-zinc-100">
-            DevForge
+          <div className="font-mono text-[10px] font-bold tracking-widest text-[#858585] uppercase">
+            DEVFORGE
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-[#0a0a0a]">
+            {mode === "login" ? "Sign In" : "Create Account"}
           </h1>
 
-          <p className="text-[#6b7280]">
+          <p className="text-xs text-[#858585]">
             {mode === "login"
-              ? "Sign in to continue."
-              : "Create your DevForge account."}
+              ? "Sign in to access your engineering workspace."
+              : "Register your DevForge account."}
           </p>
         </div>
 
-        <div className="grid grid-cols-2 border border-[#161a18]">
+        <div className="grid grid-cols-2 rounded-full border border-[#d5d9e2] bg-[#f2ede5] p-1 gap-1">
           <button
             type="button"
             onClick={() => switchMode("login")}
-            className={`px-3 py-2 ${
+            className={`rounded-full py-1.5 text-xs font-semibold transition ${
               mode === "login"
-                ? "bg-emerald-500 text-black font-bold"
-                : "bg-[#050706] text-[#9ca3af]"
+                ? "bg-white text-[#0a0a0a] shadow-xs"
+                : "text-[#858585] hover:text-[#0a0a0a]"
             }`}
           >
             Sign In
@@ -90,10 +93,10 @@ export const AuthGate: React.FC<AuthGateProps> = ({
           <button
             type="button"
             onClick={() => switchMode("register")}
-            className={`px-3 py-2 ${
+            className={`rounded-full py-1.5 text-xs font-semibold transition ${
               mode === "register"
-                ? "bg-emerald-500 text-black font-bold"
-                : "bg-[#050706] text-[#9ca3af]"
+                ? "bg-white text-[#0a0a0a] shadow-xs"
+                : "text-[#858585] hover:text-[#0a0a0a]"
             }`}
           >
             Register
@@ -101,7 +104,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
         </div>
 
         {error && (
-          <div className="border border-rose-500/30 bg-rose-500/10 p-2 text-rose-400">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
             {error}
           </div>
         )}
@@ -112,7 +115,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
         >
           {mode === "register" && (
             <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase text-[#9ca3af]">
+              <label className="mb-1 block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#858585]">
                 Display Name
               </label>
 
@@ -125,13 +128,13 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                   setDisplayName(event.target.value)
                 }
                 placeholder="Your name"
-                className="w-full border border-[#161a18] bg-[#050706] px-3 py-2 text-zinc-200 outline-none focus:border-emerald-500"
+                className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10"
               />
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase text-[#9ca3af]">
+            <label className="mb-1 block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#858585]">
               Email
             </label>
 
@@ -143,12 +146,12 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                 setEmail(event.target.value)
               }
               placeholder="you@example.com"
-              className="w-full border border-[#161a18] bg-[#050706] px-3 py-2 text-zinc-200 outline-none focus:border-emerald-500"
+              className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10"
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase text-[#9ca3af]">
+            <label className="mb-1 block font-mono text-[10px] font-semibold uppercase tracking-wider text-[#858585]">
               Password
             </label>
 
@@ -162,7 +165,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
                 setPassword(event.target.value)
               }
               placeholder="Minimum 8 characters"
-              className="w-full border border-[#161a18] bg-[#050706] px-3 py-2 text-zinc-200 outline-none focus:border-emerald-500"
+              className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10"
             />
           </div>
 
@@ -175,7 +178,7 @@ export const AuthGate: React.FC<AuthGateProps> = ({
               (mode === "register" &&
                 !displayName.trim())
             }
-            className="w-full bg-emerald-500 px-4 py-2 font-bold text-black transition-colors hover:bg-emerald-600 disabled:opacity-50"
+            className="w-full rounded-full bg-[#0a0a0a] px-4 py-2.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#262626] disabled:opacity-40"
           >
             {isSubmitting
               ? "Please wait..."

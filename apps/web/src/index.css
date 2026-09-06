@@ -3,21 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --df-bg: #050706;
-  --df-surface: #080a09;
-  --df-surface-raised: #0b0f0d;
-  --df-hover: #101512;
+  --df-page: #ffffff;
+  --df-surface: #f9f8f6;
+  --df-surface-subtle: #f2ede5;
+  --df-surface-hover: #ebe5db;
+  --df-surface-active: #e2dcce;
 
-  --df-border: #161a18;
-  --df-border-strong: #202622;
+  --df-border: #d5d9e2;
+  --df-border-strong: #b0b7c3;
 
-  --df-text: #e5e7eb;
-  --df-text-secondary: #9ca3af;
-  --df-text-muted: #6b7280;
+  --df-text: #0a0a0a;
+  --df-text-secondary: #737373;
+  --df-text-muted: #858585;
 
-  --df-emerald: #10b981;
-  --df-emerald-bright: #34d399;
-  --df-emerald-selection: #064e3b;
+  --df-code-bg: #151515;
+  --df-code-text: #f4f4f5;
 
   font-family:
     Inter,
@@ -29,7 +29,7 @@
     sans-serif;
 
   color: var(--df-text);
-  background: var(--df-bg);
+  background: var(--df-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -41,14 +41,14 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: var(--df-bg);
+  background: var(--df-page);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: var(--df-bg);
+  background: var(--df-page);
   color: var(--df-text);
   font-size: 13px;
   line-height: 1.5;
@@ -70,24 +70,24 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(16, 185, 129, 0.25);
-  color: #ffffff;
+  background: #f2ede5;
+  color: #0a0a0a;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--df-bg);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1f2723;
-  border-radius: 4px;
+  background: #d5d9e2;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #2e3b35;
+  background: #b0b7c3;
 }

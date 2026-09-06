@@ -1,4 +1,5 @@
 export type WorkItemPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type WorkItemType = "EPIC" | "FEATURE" | "TASK" | "BUG";
 
 export interface Workspace {
   id: string;
@@ -93,7 +94,7 @@ export interface WorkItem {
   projectId?: string;
   title: string;
   description?: string | null;
-  type?: string;
+  type?: WorkItemType;
   status?: string;
   priority?: WorkItemPriority;
   workflowId?: string;

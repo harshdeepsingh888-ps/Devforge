@@ -12,6 +12,7 @@ import type {
   Team,
   WorkItem,
   WorkItemPriority,
+  WorkItemType,
   WorkflowDetails,
   WorkflowState,
   Workspace,
@@ -22,6 +23,46 @@ interface WorkStreamProps {
   workspace: Workspace;
   project: Project;
 }
+
+const TYPE_OPTIONS: {
+  value: WorkItemType;
+  label: string;
+  selectedClass: string;
+  unselectedClass: string;
+}[] = [
+  {
+    value: "TASK",
+    label: "Task",
+    selectedClass:
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
+    unselectedClass:
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
+  },
+  {
+    value: "BUG",
+    label: "Bug",
+    selectedClass:
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
+    unselectedClass:
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
+  },
+  {
+    value: "FEATURE",
+    label: "Feature",
+    selectedClass:
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
+    unselectedClass:
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
+  },
+  {
+    value: "EPIC",
+    label: "Epic",
+    selectedClass:
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
+    unselectedClass:
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
+  },
+];
 
 const PRIORITY_OPTIONS: {
   value: WorkItemPriority;
@@ -34,41 +75,41 @@ const PRIORITY_OPTIONS: {
     value: "LOW",
     label: "Low",
     selectedClass:
-      "border-slate-400 bg-slate-500/20 text-slate-200 font-bold",
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
     unselectedClass:
-      "border-[#202622] bg-[#050706] text-slate-400 hover:border-slate-600",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
     badgeClass:
-      "border-slate-600/40 bg-slate-800/30 text-slate-400",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#737373]",
   },
   {
     value: "MEDIUM",
     label: "Medium",
     selectedClass:
-      "border-blue-500/60 bg-blue-500/20 text-blue-300 font-bold",
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
     unselectedClass:
-      "border-[#202622] bg-[#050706] text-zinc-400 hover:border-blue-500/40",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
     badgeClass:
-      "border-blue-500/30 bg-blue-500/10 text-blue-300",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#171717] font-semibold",
   },
   {
     value: "HIGH",
     label: "High",
     selectedClass:
-      "border-amber-500/60 bg-amber-500/20 text-amber-300 font-bold",
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
     unselectedClass:
-      "border-[#202622] bg-[#050706] text-amber-400/60 hover:border-amber-500/40",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
     badgeClass:
-      "border-amber-500/30 bg-amber-500/10 text-amber-300",
+      "border-amber-200 bg-amber-50 text-amber-900 font-bold",
   },
   {
     value: "URGENT",
     label: "Urgent",
     selectedClass:
-      "border-rose-500/60 bg-rose-500/20 text-rose-300 font-bold",
+      "border-[#0a0a0a] bg-[#0a0a0a] text-white font-bold shadow-xs",
     unselectedClass:
-      "border-[#202622] bg-[#050706] text-rose-400/60 hover:border-rose-500/40",
+      "border-[#d5d9e2] bg-[#f9f8f6] text-[#0a0a0a] hover:bg-[#f2ede5] font-semibold",
     badgeClass:
-      "border-rose-500/30 bg-rose-500/10 text-rose-300",
+      "border-rose-200 bg-rose-50 text-rose-900 font-bold",
   },
 ];
 
@@ -124,9 +165,47 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
   // Creation Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [type, setType] = useState<WorkItemType>("TASK");
+  const [parentId, setParentId] = useState<string>("");
   const [priority, setPriority] =
     useState<WorkItemPriority>("MEDIUM");
   const [isCreating, setIsCreating] = useState(false);
+
+  // Candidate parents for creation modal based on selected type
+  const candidateModalParents = items.filter((i) => {
+    const isSameProject = !i.projectId || i.projectId === project.id;
+    if (!isSameProject) return false;
+    const t = (i.type || "TASK").toUpperCase();
+    if (type === "EPIC") return false;
+    if (type === "FEATURE") return t === "EPIC";
+    return t === "EPIC" || t === "FEATURE"; // TASK or BUG
+  });
+
+  const handleTypeChange = (newType: WorkItemType) => {
+    setType(newType);
+    if (newType === "EPIC") {
+      setParentId("");
+    } else if (newType === "FEATURE") {
+      const epicCandidates = items.filter(
+        (i) =>
+          (!i.projectId || i.projectId === project.id) &&
+          (i.type || "TASK").toUpperCase() === "EPIC",
+      );
+      if (!epicCandidates.some((e) => e.id === parentId)) {
+        setParentId(epicCandidates[0]?.id || "");
+      }
+    } else {
+      // TASK or BUG
+      const validCandidates = items.filter((i) => {
+        const isSameProject = !i.projectId || i.projectId === project.id;
+        const t = (i.type || "TASK").toUpperCase();
+        return isSameProject && (t === "EPIC" || t === "FEATURE");
+      });
+      if (parentId && !validCandidates.some((c) => c.id === parentId)) {
+        setParentId("");
+      }
+    }
+  };
 
   // Deletion Modal state
   const [itemToDelete, setItemToDelete] =
@@ -207,6 +286,8 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
   const handleOpenModal = () => {
     setTitle("");
+    setType("TASK");
+    setParentId("");
     setPriority("MEDIUM");
     setError(null);
     setIsModalOpen(true);
@@ -216,6 +297,8 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
     if (isCreating) return;
     setIsModalOpen(false);
     setTitle("");
+    setType("TASK");
+    setParentId("");
     setPriority("MEDIUM");
   };
 
@@ -227,15 +310,29 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
     const workItemTitle = title.trim();
     if (!workItemTitle || isCreating) return;
 
+    if (type === "FEATURE" && !parentId) {
+      setError("A Feature requires an Epic parent. Please select a parent Epic.");
+      return;
+    }
+
     setIsCreating(true);
     setError(null);
 
     try {
+      const targetParentId =
+        type === "EPIC"
+          ? null
+          : parentId
+          ? parentId
+          : null;
+
       const created = await api.createWorkItem(
         workspace.id,
         project.id,
         workItemTitle,
         priority,
+        type,
+        targetParentId,
       );
 
       setItems((current) => [created, ...current]);
@@ -255,6 +352,8 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
       setIsModalOpen(false);
       setTitle("");
+      setType("TASK");
+      setParentId("");
       setPriority("MEDIUM");
     } catch (err) {
       console.error("Failed to create work item:", err);
@@ -370,25 +469,30 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
   const selectedItem = items.find((i) => i.id === selectedWorkItemId);
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden bg-[#f9f8f6]">
       {/* MAIN WORK STREAM AREA */}
       <main className="flex-1 min-w-0 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         {/* PROJECT HEADER & PROJECTION TABS */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#161a18] pb-4">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#d5d9e2] pb-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-            <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl font-sans">
-              {project.name}
-            </h1>
+            <div>
+              <span className="block text-[10px] font-mono font-bold uppercase tracking-widest text-[#858585]">
+                PROJECT CONTROL
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-[#0a0a0a] sm:text-3xl font-sans">
+                {project.name}
+              </h1>
+            </div>
 
             {/* PROJECTION NAVIGATION TABS */}
-            <div className="flex items-center gap-4 border-l border-[#161a18] pl-4 sm:pl-6">
+            <div className="inline-flex p-1 rounded-full bg-[#ebe6dc] border border-[#d5d9e2] shadow-xs">
               <button
                 type="button"
                 onClick={() => setProjection("BOARD")}
-                className={`pb-1 font-mono text-xs transition border-b-2 ${
+                className={`rounded-full px-4 py-1.5 font-sans text-xs transition duration-150 ${
                   projection === "BOARD"
-                    ? "border-emerald-400 font-bold text-white"
-                    : "border-transparent text-[#9ca3af] hover:text-white"
+                    ? "bg-[#0a0a0a] font-bold text-white shadow-xs"
+                    : "font-semibold text-[#737373] hover:text-[#0a0a0a]"
                 }`}
               >
                 Board
@@ -397,10 +501,10 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
               <button
                 type="button"
                 onClick={() => setProjection("LIST")}
-                className={`pb-1 font-mono text-xs transition border-b-2 ${
+                className={`rounded-full px-4 py-1.5 font-sans text-xs transition duration-150 ${
                   projection === "LIST"
-                    ? "border-emerald-400 font-bold text-white"
-                    : "border-transparent text-[#9ca3af] hover:text-white"
+                    ? "bg-[#0a0a0a] font-bold text-white shadow-xs"
+                    : "font-semibold text-[#737373] hover:text-[#0a0a0a]"
                 }`}
               >
                 List
@@ -411,7 +515,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
           <button
             type="button"
             onClick={handleOpenModal}
-            className="inline-flex min-h-8 shrink-0 items-center justify-center rounded bg-emerald-400 px-3.5 py-1.5 font-mono text-xs font-bold text-[#07110d] transition hover:bg-emerald-300"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-full bg-[#0a0a0a] px-5 py-2 font-sans text-xs font-bold text-white shadow-xs transition hover:bg-[#262626]"
           >
             + Create Work Item
           </button>
@@ -421,13 +525,13 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
         {error && (
           <div
             role="alert"
-            className="mb-5 rounded border border-red-500/40 bg-red-500/10 p-3 font-mono text-xs"
+            className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-sans text-xs text-rose-700 shadow-xs"
           >
-            <p className="font-semibold text-red-300">{error}</p>
+            <p className="font-semibold">{error}</p>
             <button
               type="button"
               onClick={() => void loadData()}
-              className="mt-1 text-xs font-medium text-red-300 underline underline-offset-4 hover:text-red-200"
+              className="mt-1.5 text-xs font-medium underline underline-offset-4 hover:text-rose-900"
             >
               Reload data
             </button>
@@ -437,13 +541,13 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
         {transitionError && (
           <div
             role="alert"
-            className="mb-5 rounded border border-amber-500/40 bg-amber-500/10 p-3 font-mono text-xs text-amber-300 flex items-center justify-between"
+            className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 font-sans text-xs text-amber-800 flex items-center justify-between shadow-xs"
           >
             <span>{transitionError}</span>
             <button
               type="button"
               onClick={() => setTransitionError(null)}
-              className="text-xs underline hover:text-amber-200"
+              className="text-xs font-semibold underline hover:text-amber-900"
             >
               Dismiss
             </button>
@@ -452,17 +556,22 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
         {/* CREATE WORK ITEM MODAL */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 font-mono text-xs select-none backdrop-blur-xs">
-            <div className="w-full max-w-md rounded-md border border-[#202622] bg-[#080a09] p-5 shadow-2xl">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-100">
-                  Create work item
-                </h2>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a]/40 p-4 font-sans text-xs select-none backdrop-blur-xs">
+            <div className="w-full max-w-lg rounded-2xl border border-[#d5d9e2] bg-white p-7 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-[#d5d9e2] pb-4">
+                <div>
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#858585] block">
+                    NEW RECORD
+                  </span>
+                  <h2 className="text-lg font-bold tracking-tight text-[#0a0a0a] font-sans">
+                    Create Work Item
+                  </h2>
+                </div>
                 <button
                   type="button"
                   onClick={handleCloseModal}
                   disabled={isCreating}
-                  className="text-base leading-none text-zinc-400 transition hover:text-white disabled:opacity-50"
+                  className="rounded-full p-1 text-xl leading-none text-[#858585] transition hover:bg-[#f9f8f6] hover:text-[#0a0a0a] disabled:opacity-50"
                 >
                   ×
                 </button>
@@ -470,7 +579,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
               <form onSubmit={handleCreateWorkItem} className="space-y-4">
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#8d99a8]">
+                  <label className="mb-1.5 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#737373]">
                     Title *
                   </label>
                   <input
@@ -482,24 +591,24 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                     maxLength={255}
                     disabled={isCreating}
                     autoFocus
-                    className="w-full rounded border border-[#202622] bg-[#050706] px-3 py-2 text-xs text-white placeholder:text-[#525d6b] outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 disabled:opacity-60 font-mono"
+                    className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3.5 py-2.5 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60 font-sans"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#8d99a8]">
-                    Priority
+                  <label className="mb-1.5 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#737373]">
+                    Type
                   </label>
                   <div className="grid grid-cols-4 gap-2">
-                    {PRIORITY_OPTIONS.map((opt) => {
-                      const isSelected = priority === opt.value;
+                    {TYPE_OPTIONS.map((opt) => {
+                      const isSelected = type === opt.value;
                       return (
                         <button
                           key={opt.value}
                           type="button"
                           disabled={isCreating}
-                          onClick={() => setPriority(opt.value)}
-                          className={`rounded px-2 py-1.5 text-center text-xs transition border ${
+                          onClick={() => handleTypeChange(opt.value)}
+                          className={`rounded-full px-3 py-2 text-center text-xs transition border ${
                             isSelected
                               ? opt.selectedClass
                               : opt.unselectedClass
@@ -512,21 +621,103 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-2.5 pt-2">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#737373]">
+                    {type === "FEATURE" ? "Parent (EPIC) *" : "Parent"}
+                  </label>
+
+                  {type === "EPIC" ? (
+                    <div className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3.5 py-2.5 text-xs text-[#858585] italic font-mono">
+                      None (EPIC cannot have parent)
+                    </div>
+                  ) : type === "FEATURE" ? (
+                    <div className="space-y-1">
+                      <select
+                        value={parentId}
+                        disabled={isCreating || candidateModalParents.length === 0}
+                        onChange={(e) => setParentId(e.target.value)}
+                        className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3.5 py-2.5 text-xs text-[#0a0a0a] outline-none transition focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60 font-mono"
+                      >
+                        <option value="" disabled>
+                          {candidateModalParents.length === 0
+                            ? "No Epics available in project"
+                            : "Select parent Epic..."}
+                        </option>
+                        {candidateModalParents.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            [{p.type || "EPIC"}] {p.title}
+                          </option>
+                        ))}
+                      </select>
+                      {candidateModalParents.length === 0 && (
+                        <p className="text-[10px] text-amber-700 font-sans">
+                          A Feature requires a parent Epic. Create an Epic first.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <select
+                      value={parentId}
+                      disabled={isCreating}
+                      onChange={(e) => setParentId(e.target.value)}
+                      className="w-full rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] px-3.5 py-2.5 text-xs text-[#0a0a0a] outline-none transition focus:border-[#0a0a0a] focus:bg-white focus:ring-1 focus:ring-[#0a0a0a]/10 disabled:opacity-60 font-mono"
+                    >
+                      <option value="">Not linked (Standalone)</option>
+                      {candidateModalParents.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.type || "ITEM"}] {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#737373]">
+                    Priority
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {PRIORITY_OPTIONS.map((opt) => {
+                      const isSelected = priority === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          disabled={isCreating}
+                          onClick={() => setPriority(opt.value)}
+                          className={`rounded-full px-3 py-2 text-center text-xs transition border ${
+                            isSelected
+                              ? opt.selectedClass
+                              : opt.unselectedClass
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#d5d9e2]">
                   <button
                     type="button"
                     onClick={handleCloseModal}
                     disabled={isCreating}
-                    className="rounded px-3 py-1.5 font-semibold text-zinc-400 transition hover:bg-[#121714] hover:text-white disabled:opacity-50"
+                    className="rounded-full border border-[#d5d9e2] bg-white px-5 py-2 text-xs font-semibold text-[#0a0a0a] shadow-xs transition hover:bg-[#f9f8f6] disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={isCreating || !title.trim()}
-                    className="rounded bg-emerald-400 px-4 py-1.5 font-bold text-[#07110d] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={
+                      isCreating ||
+                      !title.trim() ||
+                      (type === "FEATURE" &&
+                        (!parentId || candidateModalParents.length === 0))
+                    }
+                    className="rounded-full bg-[#0a0a0a] px-6 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#262626] disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {isCreating ? "Creating..." : "Create item"}
+                    {isCreating ? "Creating..." : "Create Item"}
                   </button>
                 </div>
               </form>
@@ -536,10 +727,10 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
         {/* DELETE CONFIRMATION MODAL */}
         {itemToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 font-mono text-xs select-none backdrop-blur-xs">
-            <div className="w-full max-w-md space-y-4 rounded-md border border-[#202622] bg-[#080a09] p-5 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0a]/40 p-4 font-sans text-xs select-none backdrop-blur-xs">
+            <div className="w-full max-w-md space-y-4 rounded-2xl border border-[#d5d9e2] bg-white p-7 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-[#d5d9e2] pb-3">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-rose-700 font-mono">
                   Delete work item?
                 </h2>
                 <button
@@ -551,18 +742,17 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                     }
                   }}
                   disabled={isDeleting}
-                  className="text-base leading-none text-zinc-400 transition hover:text-white disabled:opacity-50"
+                  className="rounded-full p-1 text-lg leading-none text-[#858585] transition hover:text-[#0a0a0a] disabled:opacity-50"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="space-y-1.5 text-zinc-300">
-                <p className="break-words text-xs font-semibold text-white">
-                  &ldquo;{itemToDelete.title}&rdquo; will be permanently
-                  deleted.
+              <div className="space-y-1.5 text-[#0a0a0a]">
+                <p className="break-words text-xs font-semibold text-[#0a0a0a]">
+                  &ldquo;{itemToDelete.title}&rdquo; will be permanently deleted.
                 </p>
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-[#737373]">
                   This action cannot be undone.
                 </p>
               </div>
@@ -570,13 +760,13 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
               {deleteError && (
                 <div
                   role="alert"
-                  className="rounded border border-red-500/50 bg-red-500/10 p-2.5 text-xs font-semibold text-red-300"
+                  className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700"
                 >
                   {deleteError}
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2.5 pt-1">
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#d5d9e2]">
                 <button
                   type="button"
                   onClick={() => {
@@ -584,7 +774,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                     setDeleteError(null);
                   }}
                   disabled={isDeleting}
-                  className="rounded px-3 py-1.5 font-semibold text-zinc-400 transition hover:bg-[#121714] hover:text-white disabled:opacity-50"
+                  className="rounded-full border border-[#d5d9e2] bg-white px-4 py-2 text-xs font-semibold text-[#0a0a0a] shadow-xs transition hover:bg-[#f9f8f6] disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -592,7 +782,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                   type="button"
                   onClick={handleConfirmDelete}
                   disabled={isDeleting}
-                  className="rounded border border-rose-500/50 bg-rose-500/20 px-4 py-1.5 font-bold text-rose-300 transition hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-full bg-rose-600 px-5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {isDeleting ? "Deleting..." : "Delete item"}
                 </button>
@@ -603,22 +793,22 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
         {/* PROJECTION: BOARD vs LIST */}
         {isLoading ? (
-          <div className="py-16 text-center font-mono text-xs text-[#6b7280]">
+          <div className="py-20 text-center font-mono text-xs text-[#858585]">
             Loading work stream…
           </div>
         ) : projection === "BOARD" ? (
           /* BOARD PROJECTION */
           <div>
             {items.length === 0 && (
-              <div className="mb-6 rounded border border-dashed border-[#202622] bg-[#080a09] p-6 text-center font-mono text-xs">
-                <p className="font-semibold text-white">No work items yet</p>
-                <p className="mt-1 text-[#9ca3af]">
+              <div className="mb-6 rounded-2xl border border-dashed border-[#d5d9e2] bg-white p-12 text-center font-sans text-xs shadow-xs">
+                <p className="font-bold text-[#0a0a0a] text-sm">No work items yet</p>
+                <p className="mt-1 text-[#858585]">
                   Create your first work item to start planning and tracking engineering work.
                 </p>
                 <button
                   type="button"
                   onClick={handleOpenModal}
-                  className="mt-3 rounded bg-emerald-400 px-3.5 py-1 text-xs font-bold text-[#07110d] transition hover:bg-emerald-300"
+                  className="mt-4 inline-flex items-center rounded-full bg-[#0a0a0a] px-5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#262626]"
                 >
                   + Create Work Item
                 </button>
@@ -626,11 +816,11 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
             )}
 
             {workflowDetails && workflowDetails.states.length > 0 ? (
-              <div className="overflow-x-auto pb-4">
+              <div className="overflow-x-auto pb-6">
                 <div
-                  className="grid gap-4 min-w-[700px]"
+                  className="grid gap-5 min-w-[760px]"
                   style={{
-                    gridTemplateColumns: `repeat(${workflowDetails.states.length}, minmax(220px, 1fr))`,
+                    gridTemplateColumns: `repeat(${workflowDetails.states.length}, minmax(260px, 1fr))`,
                   }}
                 >
                   {workflowDetails.states.map((state) => {
@@ -641,18 +831,20 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                     return (
                       <div
                         key={state.id}
-                        className="flex flex-col rounded border border-[#161a18] bg-[#080a09]/60 min-h-[350px]"
+                        className="flex flex-col rounded-2xl border border-[#d5d9e2] bg-[#f2ede5]/75 min-h-[460px] shadow-xs"
                       >
-                        <div className="flex items-center justify-between border-b border-[#161a18] p-3 font-mono">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-[#9ca3af]">
+                        {/* COLUMN HEADER */}
+                        <div className="flex items-center justify-between border-b border-[#d5d9e2]/80 px-4 py-3 bg-white/40 rounded-t-2xl">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#0a0a0a] font-sans">
                             {state.name}
                           </span>
-                          <span className="rounded bg-[#161a18] px-1.5 py-0.5 text-[10px] font-semibold text-[#6b7280]">
+                          <span className="rounded-full bg-white border border-[#d5d9e2] px-2.5 py-0.5 text-[10px] font-mono font-bold text-[#0a0a0a] shadow-xs">
                             {stateItems.length}
                           </span>
                         </div>
 
-                        <div className="flex-1 p-2 space-y-2.5 overflow-y-auto">
+                        {/* COLUMN ITEMS LIST */}
+                        <div className="flex-1 p-3 space-y-3 overflow-y-auto">
                           {stateItems.map((item) => {
                             const priorityConfig =
                               PRIORITY_OPTIONS.find(
@@ -676,28 +868,29 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                 key={item.id}
                                 onClick={() => setSelectedWorkItemId(item.id)}
                                 className={[
-                                  "group relative cursor-pointer rounded border p-3 font-mono text-xs transition",
+                                  "group relative cursor-pointer rounded-xl border p-4 text-xs transition duration-150 bg-white",
                                   isSelected
-                                    ? "border-emerald-400 bg-[#064e3b]/20 shadow-sm"
-                                    : "border-[#202622] bg-[#050706] hover:border-[#303c35]",
+                                    ? "border-[#0a0a0a] ring-2 ring-[#0a0a0a]/10 shadow-sm"
+                                    : "border-[#d5d9e2] hover:border-[#0a0a0a] shadow-[0_1px_3px_rgba(0,0,0,0.03)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.06)]",
                                 ].join(" ")}
                               >
-                                <div className="mb-2 flex items-center justify-between gap-1.5 text-[10px]">
+                                {/* CARD TOP METADATA & ACTIONS */}
+                                <div className="mb-2.5 flex items-center justify-between gap-1.5 text-[10px]">
                                   <div className="flex items-center gap-1.5 shrink-0">
-                                    <span className="rounded border border-[#202622] bg-[#0b0f0d] px-1.5 py-0.5 font-semibold text-[#9ca3af]">
+                                    <span className="rounded-md border border-[#d5d9e2] bg-[#f9f8f6] px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#525252] uppercase tracking-wider">
                                       {item.type || "TASK"}
                                     </span>
 
                                     {item.priority && (
                                       <span
-                                        className={`rounded border px-1.5 py-0.5 font-semibold ${priorityConfig.badgeClass}`}
+                                        className={`rounded-md border px-1.5 py-0.5 font-mono text-[9px] ${priorityConfig.badgeClass}`}
                                       >
                                         {item.priority}
                                       </span>
                                     )}
                                   </div>
 
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
                                     {allowedTargets.length > 0 && (
                                       <button
                                         type="button"
@@ -710,7 +903,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                               : item.id,
                                           );
                                         }}
-                                        className="rounded border border-[#202622] bg-[#080a09] px-1.5 py-0.5 text-[10px] text-[#9ca3af] transition hover:border-emerald-500/50 hover:text-white disabled:opacity-50"
+                                        className="rounded-full border border-[#d5d9e2] bg-white px-2 py-0.5 font-sans text-[10px] font-medium text-[#737373] transition hover:border-[#0a0a0a] hover:text-[#0a0a0a] disabled:opacity-50"
                                         title="Move work item to next state"
                                       >
                                         {isItemTransitioning
@@ -726,7 +919,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                         setDeleteError(null);
                                         setItemToDelete(item);
                                       }}
-                                      className="rounded border border-[#202622] bg-[#080a09] px-1.5 py-0.5 text-[10px] text-[#9ca3af] transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300"
+                                      className="rounded-full border border-rose-200/80 bg-white px-2 py-0.5 font-sans text-[10px] font-medium text-rose-600 transition hover:bg-rose-50"
                                       title="Delete work item"
                                     >
                                       Delete
@@ -734,9 +927,10 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                   </div>
                                 </div>
 
+                                {/* MOVE STATE POPUP */}
                                 {isMoveMenuOpen && (
-                                  <div className="mb-2.5 rounded border border-emerald-500/40 bg-[#080a09] p-2 space-y-1.5 z-10 shadow-lg">
-                                    <div className="text-[9px] uppercase font-bold text-emerald-400 tracking-wider">
+                                  <div className="mb-3 rounded-xl border border-[#d5d9e2] bg-[#f9f8f6] p-2.5 space-y-1.5 z-10 shadow-md">
+                                    <div className="text-[9px] uppercase font-mono font-bold text-[#0a0a0a] tracking-wider">
                                       Move to state:
                                     </div>
                                     <div className="space-y-1">
@@ -752,7 +946,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                               target.id,
                                             );
                                           }}
-                                          className="w-full rounded border border-[#202622] bg-[#050706] px-2 py-1 text-left text-[10px] text-white hover:border-emerald-500 hover:bg-emerald-500/10"
+                                          className="w-full rounded-lg border border-[#d5d9e2] bg-white px-2.5 py-1 text-left font-mono text-[10px] font-semibold text-[#0a0a0a] hover:border-[#0a0a0a] hover:bg-[#f2ede5] transition"
                                         >
                                           &rarr; {target.name}
                                         </button>
@@ -761,12 +955,13 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                                   </div>
                                 )}
 
+                                {/* CARD TITLE & DESCRIPTION */}
                                 <div className="font-sans">
-                                  <p className="break-words font-medium text-xs text-[#e5e7eb]">
+                                  <p className="break-words font-semibold text-xs text-[#0a0a0a] leading-snug group-hover:text-black">
                                     {item.title}
                                   </p>
                                   {item.description && (
-                                    <p className="mt-1 break-words text-[11px] text-[#9ca3af]">
+                                    <p className="mt-1.5 break-words text-[11px] text-[#737373] line-clamp-2 leading-relaxed">
                                       {item.description}
                                     </p>
                                   )}
@@ -781,7 +976,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="py-12 text-center font-mono text-xs text-[#6b7280]">
+              <div className="py-16 text-center font-mono text-xs text-[#858585]">
                 No workflow defined for board layout.
               </div>
             )}
@@ -790,27 +985,27 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
           /* LIST PROJECTION */
           <div>
             {items.length === 0 ? (
-              <div className="rounded border border-dashed border-[#202622] bg-[#080a09] p-8 text-center sm:p-12 font-mono">
+              <div className="rounded-2xl border border-dashed border-[#d5d9e2] bg-white p-12 text-center font-sans shadow-xs">
                 <div className="mx-auto max-w-sm">
-                  <h2 className="text-sm font-semibold text-white">
+                  <h2 className="text-sm font-bold text-[#0a0a0a]">
                     No work items yet
                   </h2>
 
-                  <p className="mt-1.5 text-xs text-[#9ca3af] leading-relaxed">
+                  <p className="mt-1.5 text-xs text-[#858585] leading-relaxed">
                     Create your first work item to start planning and tracking engineering work.
                   </p>
 
                   <button
                     type="button"
                     onClick={handleOpenModal}
-                    className="mt-4 rounded bg-emerald-400 px-4 py-1.5 text-xs font-bold text-[#07110d] transition hover:bg-emerald-300"
+                    className="mt-4 inline-flex items-center rounded-full bg-[#0a0a0a] px-5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#262626]"
                   >
                     + Create Work Item
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="border-t border-b border-[#161a18] divide-y divide-[#161a18]">
+              <div className="rounded-2xl border border-[#d5d9e2] bg-white overflow-hidden shadow-xs divide-y divide-[#d5d9e2]">
                 {items.map((item) => {
                   const priorityConfig =
                     PRIORITY_OPTIONS.find(
@@ -828,24 +1023,24 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                       key={item.id}
                       onClick={() => setSelectedWorkItemId(item.id)}
                       className={[
-                        "group flex cursor-pointer flex-col gap-2 py-3 px-2 sm:flex-row sm:items-center sm:justify-between transition",
+                        "group flex cursor-pointer flex-col gap-2.5 py-3.5 px-4 sm:flex-row sm:items-center sm:justify-between transition",
                         isSelected
-                          ? "border-l-2 border-emerald-400 bg-[#064e3b]/20"
-                          : "hover:bg-[#0b0f0d]/50",
+                          ? "border-l-4 border-l-[#0a0a0a] bg-[#f2ede5]/60"
+                          : "hover:bg-[#f9f8f6]",
                       ].join(" ")}
                     >
                       <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <span className="mt-0.5 shrink-0 rounded border border-[#202622] bg-[#0b0f0d] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#9ca3af]">
+                        <span className="mt-0.5 shrink-0 rounded-md border border-[#d5d9e2] bg-[#f9f8f6] px-2 py-0.5 font-mono text-[9px] font-bold text-[#525252] uppercase tracking-wider">
                           {item.type || "TASK"}
                         </span>
 
                         <div className="min-w-0 flex-1">
-                          <p className="break-words text-xs sm:text-sm font-medium text-[#e5e7eb] font-sans">
+                          <p className="break-words text-xs sm:text-sm font-bold text-[#0a0a0a] font-sans">
                             {item.title}
                           </p>
 
                           {item.description && (
-                            <p className="mt-0.5 break-words text-xs text-[#9ca3af] font-sans">
+                            <p className="mt-0.5 break-words text-xs text-[#737373] font-sans">
                               {item.description}
                             </p>
                           )}
@@ -854,14 +1049,14 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
 
                       <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
                         {stateObj && (
-                          <span className="rounded border border-[#202622] bg-[#080a09] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#9ca3af]">
+                          <span className="rounded-full border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-0.5 font-mono text-[10px] font-semibold text-[#737373]">
                             {stateObj.name}
                           </span>
                         )}
 
                         {item.priority && (
                           <span
-                            className={`rounded border px-2 py-0.5 font-mono text-[10px] font-semibold ${priorityConfig.badgeClass}`}
+                            className={`rounded-full border px-2.5 py-0.5 font-mono text-[10px] ${priorityConfig.badgeClass}`}
                           >
                             {item.priority}
                           </span>
@@ -874,7 +1069,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                             setDeleteError(null);
                             setItemToDelete(item);
                           }}
-                          className="rounded border border-[#202622] bg-[#080a09] px-2 py-0.5 font-mono text-[10px] font-medium text-[#9ca3af] transition hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300"
+                          className="rounded-full border border-rose-200 bg-white px-3 py-0.5 font-sans text-[10px] font-medium text-rose-600 transition hover:bg-rose-50"
                           title="Delete work item"
                         >
                           Delete
@@ -893,7 +1088,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
       {selectedItem && (
         <>
           {/* DESKTOP SIDE PANEL (lg screens) */}
-          <div className="hidden lg:block w-[360px] shrink-0 h-full">
+          <div className="hidden lg:block w-[380px] shrink-0 h-full">
             <WorkItemInspector
               item={selectedItem}
               workspace={workspace}
@@ -910,6 +1105,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                 setItemToDelete(item);
               }}
               onTeamCreated={handleTeamCreated}
+              onSelectItem={(target) => setSelectedWorkItemId(target.id)}
             />
           </div>
 
@@ -919,9 +1115,9 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
               type="button"
               aria-label="Close inspector"
               onClick={() => setSelectedWorkItemId(null)}
-              className="fixed inset-0 bg-black/75 backdrop-blur-xs"
+              className="fixed inset-0 bg-[#0a0a0a]/40 backdrop-blur-xs"
             />
-            <div className="relative ml-auto flex w-[360px] max-w-[85%] flex-col bg-[#080a09] shadow-2xl h-full">
+            <div className="relative ml-auto flex w-[380px] max-w-[85%] flex-col bg-white border-l border-[#d5d9e2] shadow-2xl h-full">
               <WorkItemInspector
                 item={selectedItem}
                 workspace={workspace}
@@ -938,6 +1134,7 @@ export const WorkStream: React.FC<WorkStreamProps> = ({
                   setItemToDelete(item);
                 }}
                 onTeamCreated={handleTeamCreated}
+                onSelectItem={(target) => setSelectedWorkItemId(target.id)}
               />
             </div>
           </div>

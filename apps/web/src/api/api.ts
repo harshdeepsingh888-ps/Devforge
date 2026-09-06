@@ -11,6 +11,7 @@ import type {
   WorkItem,
   WorkItemHistory,
   WorkItemPriority,
+  WorkItemType,
   Workflow,
   WorkflowDetails,
   Workspace,
@@ -152,15 +153,18 @@ export const api = {
     projectId: string,
     title: string,
     priority?: WorkItemPriority,
+    type: WorkItemType = "TASK",
+    parentId?: string | null,
   ): Promise<WorkItem> {
     return apiFetch<WorkItem>(
       `/api/workspaces/${workspaceId}/projects/${projectId}/work-items`,
       {
         method: "POST",
         body: JSON.stringify({
-          type: "TASK",
+          type,
           title,
           ...(priority ? { priority } : {}),
+          ...(parentId ? { parentId } : {}),
         }),
       },
     );

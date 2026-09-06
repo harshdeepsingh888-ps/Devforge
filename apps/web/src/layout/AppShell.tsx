@@ -30,7 +30,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#050706] text-[#e5e7eb] font-sans">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#ffffff] text-[#0a0a0a] font-sans">
       {/* TOPBAR */}
       <Topbar
         workspace={workspace}
@@ -59,9 +59,9 @@ export const AppShell: React.FC<AppShellProps> = ({
               type="button"
               aria-label="Close sidebar"
               onClick={() => setMobileSidebarOpen(false)}
-              className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/30 backdrop-blur-xs"
             />
-            <div className="relative flex w-64 max-w-[80%] flex-col bg-[#050706] shadow-2xl">
+            <div className="relative flex w-64 max-w-[80%] flex-col bg-[#f9f8f6] border-r border-[#d5d9e2] shadow-xl">
               <Sidebar
                 workspace={workspace}
                 projects={projects}
@@ -78,7 +78,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         )}
 
         {/* MAIN CONTENT AREA */}
-        <div className="min-w-0 flex-1 overflow-y-auto bg-[#050706]">
+        <div className="min-w-0 flex-1 overflow-y-auto bg-[#ffffff]">
           {children}
         </div>
       </div>

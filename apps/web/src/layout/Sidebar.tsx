@@ -51,26 +51,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[#161a18] bg-[#050706] text-xs font-mono select-none">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-[#d5d9e2] bg-[#f9f8f6] text-xs font-sans select-none">
       {/* BRAND & ACTIVE WORKSPACE */}
-      <div className="border-b border-[#161a18] p-4">
+      <div className="border-b border-[#d5d9e2] p-4 bg-white">
         <div className="flex items-center justify-between">
-          <span className="font-bold tracking-widest text-emerald-400 text-[11px]">
+          <span className="font-mono font-bold tracking-widest text-[#0a0a0a] text-xs">
             DEVFORGE
           </span>
-          <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 border border-emerald-500/20">
-            PROD
+          <span className="rounded-full bg-[#f9f8f6] px-2 py-0.5 text-[9px] font-mono font-bold text-[#737373] border border-[#d5d9e2]">
+            CONTROL PLANE
           </span>
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="truncate font-semibold text-white text-xs font-sans">
-            {workspace.name}
-          </span>
+          <div className="min-w-0">
+            <span className="block text-[10px] font-mono font-semibold uppercase tracking-wider text-[#858585]">
+              Workspace
+            </span>
+            <span className="truncate font-bold text-[#0a0a0a] text-xs block">
+              {workspace.name}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onSwitchWorkspace}
-            className="shrink-0 text-[10px] text-[#6b7280] transition hover:text-emerald-400"
+            className="shrink-0 font-sans text-[11px] font-medium text-[#737373] transition hover:text-[#0a0a0a] hover:underline underline-offset-2"
             title="Switch Workspace"
           >
             Switch
@@ -79,21 +84,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* CORE NAVIGATION */}
-      <div className="p-3 border-b border-[#161a18] space-y-1">
-        <div className="flex items-center justify-between rounded px-2.5 py-1.5 text-[#6b7280] opacity-60">
-          <span className="font-medium text-xs">INBOX</span>
-          <span className="text-[10px] font-bold">0</span>
+      <div className="p-3 border-b border-[#d5d9e2] space-y-1">
+        <div className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[#858585] opacity-50">
+          <span className="font-medium text-xs font-mono">INBOX</span>
+          <span className="text-[10px] font-bold font-mono">0</span>
         </div>
 
-        <div className="flex items-center justify-between rounded border-l-2 border-emerald-400 bg-[#064e3b]/20 px-2.5 py-1.5 font-semibold text-emerald-300">
-          <span className="text-xs">Work Stream</span>
+        <div className="flex items-center justify-between rounded-lg bg-white border border-[#d5d9e2] px-3 py-2 font-bold text-[#0a0a0a] shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#0a0a0a]" />
+            <span className="text-xs">Work Stream</span>
+          </div>
         </div>
       </div>
 
       {/* PROJECTS SECTION */}
       <div className="flex-1 overflow-y-auto p-3">
         <div className="mb-2 flex items-center justify-between px-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#6b7280]">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#858585]">
             Projects
           </span>
           <button
@@ -102,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               setCreateError(null);
               setIsCreatingProject((prev) => !prev);
             }}
-            className="inline-flex h-5 w-5 items-center justify-center rounded border border-[#202622] text-[#9ca3af] transition hover:border-emerald-500/50 hover:text-white"
+            className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[#d5d9e2] bg-white text-[#0a0a0a] transition hover:border-[#0a0a0a] hover:bg-[#f2ede5] shadow-xs text-xs font-semibold"
             title="Create Project"
           >
             +
@@ -111,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* INLINE CREATE PROJECT FORM */}
         {isCreatingProject && (
-          <form onSubmit={handleCreateProject} className="mb-3 space-y-2 rounded border border-[#202622] bg-[#080a09] p-2">
+          <form onSubmit={handleCreateProject} className="mb-3 space-y-2 rounded-xl border border-[#d5d9e2] bg-white p-3 shadow-xs">
             <input
               type="text"
               autoFocus
@@ -122,12 +130,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               placeholder="Project name..."
               disabled={isSubmitting}
-              className="w-full rounded border border-[#202622] bg-[#050706] px-2 py-1 text-xs text-white placeholder:text-[#525d6b] outline-none focus:border-emerald-500"
+              className="w-full rounded-lg border border-[#d5d9e2] bg-[#f9f8f6] px-2.5 py-1.5 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none focus:border-[#0a0a0a] focus:bg-white font-sans"
             />
             {createError && (
-              <p className="text-[10px] text-rose-400">{createError}</p>
+              <p className="text-[10px] font-medium text-rose-700">{createError}</p>
             )}
-            <div className="flex items-center justify-end gap-1.5">
+            <div className="flex items-center justify-end gap-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -136,14 +144,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   setCreateError(null);
                 }}
                 disabled={isSubmitting}
-                className="px-2 py-1 text-[10px] text-[#9ca3af] hover:text-white"
+                className="px-2 py-1 text-[11px] font-medium text-[#737373] hover:text-[#0a0a0a]"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting || !newProjectName.trim()}
-                className="rounded bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-black hover:bg-emerald-400 disabled:opacity-40"
+                className="rounded-full bg-[#0a0a0a] px-3.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-[#262626] disabled:opacity-40"
               >
                 {isSubmitting ? "Creating..." : "Create"}
               </button>
@@ -153,21 +161,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* PROJECT LIST */}
         {projects.length === 0 ? (
-          <div className="px-1 py-3 text-center">
-            <p className="text-[11px] text-[#6b7280]">No projects yet</p>
+          <div className="px-1 py-4 text-center">
+            <p className="text-xs text-[#737373]">No projects yet</p>
             <button
               type="button"
               onClick={() => {
                 setCreateError(null);
                 setIsCreatingProject(true);
               }}
-              className="mt-2 text-xs font-medium text-emerald-400 underline underline-offset-4 hover:text-emerald-300"
+              className="mt-2 text-xs font-semibold text-[#0a0a0a] underline underline-offset-4 hover:text-[#262626]"
             >
               Create project
             </button>
           </div>
         ) : (
-          <nav className="space-y-0.5">
+          <nav className="space-y-1">
             {projects.map((project) => {
               const isActive = project.id === activeProject.id;
 
@@ -177,13 +185,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   onClick={() => onSelectProject(project)}
                   className={[
-                    "flex w-full items-center rounded px-2.5 py-1.5 text-left text-xs transition",
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition",
                     isActive
-                      ? "border-l-2 border-emerald-400 bg-[#064e3b]/20 font-medium text-emerald-300"
-                      : "text-[#9ca3af] hover:bg-[#101512] hover:text-white",
+                      ? "bg-white font-bold text-[#0a0a0a] border border-[#d5d9e2] shadow-xs"
+                      : "text-[#737373] hover:bg-[#f2ede5]/70 hover:text-[#0a0a0a] font-medium",
                   ].join(" ")}
                 >
-                  <span className="block truncate">{project.name}</span>
+                  <span className="block truncate font-sans">{project.name}</span>
+                  {isActive && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#0a0a0a] shrink-0" />
+                  )}
                 </button>
               );
             })}
@@ -192,8 +203,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* FOOTER */}
-      <div className="border-t border-[#161a18] p-3 text-[10px] text-[#6b7280]">
-        <span>Control Plane v0.1</span>
+      <div className="border-t border-[#d5d9e2] p-3.5 bg-white font-mono text-[10px] text-[#858585] flex items-center justify-between">
+        <span>DevForge Control Plane</span>
+        <span>v0.1</span>
       </div>
     </aside>
   );

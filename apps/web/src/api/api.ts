@@ -1,5 +1,8 @@
 import {
   apiFetch,
+  clearStoredTokens,
+  refreshAuthSession,
+  setStoredRefreshToken,
   setStoredToken,
 } from "../services/api-client";
 
@@ -56,6 +59,7 @@ export const api = {
       );
 
     setStoredToken(result.accessToken);
+    setStoredRefreshToken(result.refreshToken);
 
     return result;
   },
@@ -79,8 +83,17 @@ export const api = {
       );
 
     setStoredToken(result.accessToken);
+    setStoredRefreshToken(result.refreshToken);
 
     return result;
+  },
+
+  async refreshSession(): Promise<string> {
+    return refreshAuthSession();
+  },
+
+  logout(): void {
+    clearStoredTokens();
   },
 
   /*

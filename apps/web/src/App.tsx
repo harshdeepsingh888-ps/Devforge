@@ -6,8 +6,10 @@ import React, {
 
 import { api } from "./api/api";
 import {
+  clearStoredTokens,
+  getStoredRefreshToken,
   getStoredToken,
-  setStoredToken,
+  onAuthRevoked,
 } from "./services/api-client";
 
 import { AppShell } from "./layout/AppShell";
@@ -25,11 +27,13 @@ export const App: React.FC = () => {
   /*
    * AUTHENTICATION
    *
-   * The access token is stored by api.login/api.register.
-   * If there is no token, AuthGate is the first screen.
+   * The access/refresh tokens are stored by api.login/api.register.
+   * If there is no token or refresh session, AuthGate is the first screen.
    */
   const [isAuthenticated, setIsAuthenticated] =
-    useState<boolean>(() => Boolean(getStoredToken()));
+    useState<boolean>(() =>
+      Boolean(getStoredToken() || getStoredRefreshToken()),
+    );
 
   /*
    * WORKSPACES
@@ -59,12 +63,27 @@ export const App: React.FC = () => {
    */
   const [isLoading, setIsLoading] =
     useState<boolean>(() =>
-      Boolean(getStoredToken()),
+      Boolean(getStoredToken() || getStoredRefreshToken()),
     );
 
   const [error, setError] = useState<
     string | null
   >(null);
+
+  /*
+   * LISTEN FOR AUTH REVOCATION
+   */
+  useEffect(() => {
+    const unsubscribe = onAuthRevoked(() => {
+      setIsAuthenticated(false);
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+      setProjects([]);
+      setActiveProject(null);
+    });
+
+    return unsubscribe;
+  }, []);
 
   /*
    * LOAD WORKSPACES
@@ -74,7 +93,7 @@ export const App: React.FC = () => {
    * Important:
    * We do NOT convert API errors into [].
    *
-   * A 401 means authentication failed.
+   * A 401 (after refresh failure) means authentication failed.
    * An empty array means the authenticated user
    * genuinely has no workspaces.
    */
@@ -102,17 +121,13 @@ export const App: React.FC = () => {
         setProjects([]);
         setActiveProject(null);
       } catch (err) {
-        /*
-         * apiFetch removes the stored token when
-         * the backend returns 401.
-         */
         if (
           err &&
           typeof err === "object" &&
           "statusCode" in err &&
           err.statusCode === 401
         ) {
-          setStoredToken(null);
+          clearStoredTokens();
 
           setIsAuthenticated(false);
 
@@ -181,7 +196,7 @@ export const App: React.FC = () => {
           "statusCode" in err &&
           err.statusCode === 401
         ) {
-          setStoredToken(null);
+          clearStoredTokens();
 
           setIsAuthenticated(false);
 

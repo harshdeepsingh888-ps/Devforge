@@ -12,6 +12,8 @@ import {
   WorkspaceNotFoundError,
   WorkspaceSlugAlreadyExistsError,
   WorkspaceMembershipAlreadyExistsError,
+  WorkspacePermissionDeniedError,
+  TeamSlugAlreadyExistsError,
 } from "../workspace.errors.js";
 import type { WorkspaceService } from "../services/workspace.service.js";
 import type { TeamService } from "../services/team.service.js";
@@ -129,6 +131,12 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
           message: error.message,
         });
       }
+      if (error instanceof WorkspacePermissionDeniedError) {
+        return reply.code(403).send({
+          error: "FORBIDDEN",
+          message: error.message,
+        });
+      }
       throw error;
     }
   });
@@ -178,6 +186,18 @@ export const workspaceRoutes: FastifyPluginAsync<WorkspaceRoutesOptions> = async
     } catch (error) {
       if (error instanceof WorkspaceNotFoundError) {
         return reply.code(404).send({
+          error: error.code,
+          message: error.message,
+        });
+      }
+      if (error instanceof WorkspacePermissionDeniedError) {
+        return reply.code(403).send({
+          error: "FORBIDDEN",
+          message: error.message,
+        });
+      }
+      if (error instanceof TeamSlugAlreadyExistsError) {
+        return reply.code(409).send({
           error: error.code,
           message: error.message,
         });

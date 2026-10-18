@@ -8,6 +8,7 @@ interface TopbarProps {
   projects?: Project[];
   onSelectProject?: (project: Project) => void;
   onSwitchWorkspace: () => void;
+  onLogout: () => void | Promise<void>;
   onToggleMobileSidebar?: () => void;
 }
 
@@ -17,9 +18,11 @@ export const Topbar: React.FC<TopbarProps> = ({
   projects = [],
   onSelectProject,
   onSwitchWorkspace,
+  onLogout,
   onToggleMobileSidebar,
 }) => {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const projectMenuRef = useRef<HTMLDivElement>(null);
   const { mode, resolvedTheme, setMode } = useTheme();
 
@@ -49,6 +52,16 @@ export const Topbar: React.FC<TopbarProps> = ({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isProjectMenuOpen]);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await onLogout();
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center justify-between border-b border-[#d5d9e2] dark:border-white/[0.06] bg-white dark:bg-[#111110] px-4 md:px-6 select-none">
@@ -207,6 +220,16 @@ export const Topbar: React.FC<TopbarProps> = ({
           className="rounded-lg border border-[#d5d9e2] dark:border-white/[0.08] bg-white dark:bg-[#161514] px-3 py-1 text-xs font-medium text-[#0a0a0a] dark:text-[#9e9a93] transition duration-150 hover:border-[#0a0a0a] dark:hover:border-white/20 hover:bg-[#f2ede5] dark:hover:bg-[#1a1918] hover:text-[#0a0a0a] dark:hover:text-white shadow-xs"
         >
           Switch workspace
+        </button>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          aria-label="Log out"
+          className="rounded-lg border border-[#d5d9e2] dark:border-white/[0.08] bg-white dark:bg-[#161514] px-3 py-1 text-xs font-medium text-[#0a0a0a] dark:text-[#9e9a93] transition duration-150 hover:border-[#0a0a0a] dark:hover:border-white/20 hover:bg-[#f2ede5] dark:hover:bg-[#1a1918] hover:text-[#0a0a0a] dark:hover:text-white shadow-xs disabled:cursor-wait disabled:opacity-60"
+        >
+          {isLoggingOut ? "Logging out…" : "Log out"}
         </button>
       </div>
     </header>

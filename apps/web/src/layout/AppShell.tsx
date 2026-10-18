@@ -12,6 +12,7 @@ interface AppShellProps {
   onProjectUpdated: (project: Project) => void;
   onProjectDeleted: (projectId: string) => void;
   onSwitchWorkspace: () => void;
+  onLogout: () => void | Promise<void>;
   children: React.ReactNode;
 }
 
@@ -24,6 +25,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onProjectUpdated,
   onProjectDeleted,
   onSwitchWorkspace,
+  onLogout,
   children,
 }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -42,6 +44,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         projects={projects.filter((p) => p.status !== "ARCHIVED")}
         onSelectProject={onSelectProject}
         onSwitchWorkspace={onSwitchWorkspace}
+        onLogout={onLogout}
         onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
       />
 

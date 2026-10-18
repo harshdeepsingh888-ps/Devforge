@@ -7,6 +7,7 @@ import {
   clearStoredTokens,
   getStoredRefreshToken,
   getStoredToken,
+  logoutSession,
   onAuthRevoked,
   refreshAuthSession,
   setStoredRefreshToken,
@@ -394,6 +395,233 @@ test("@devforge/web: Auth Session — Auth Endpoints (/login, /register) Do Not 
     // Refresh should NOT have been called for a failed login!
     assert.equal(refreshCallCount, 0);
   } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("@devforge/web: Auth Session — Retried Request Failure After Successful Refresh Keeps Its Own Status", async () => {
+  setupMockLocalStorage();
+  clearStoredTokens();
+
+  setStoredToken("expired_access_token");
+  setStoredRefreshToken("valid_refresh_token_retry");
+
+  let revocationCount = 0;
+  const unsubscribe = onAuthRevoked(() => {
+    revocationCount++;
+  });
+
+  let refreshCallCount = 0;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === "/api/auth/refresh") {
+      refreshCallCount++;
+      return new Response(
+        JSON.stringify({
+          data: {
+            accessToken: "fresh_access_token",
+            refreshToken: "fresh_refresh_token",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const authHeader = new Headers(init?.headers).get("Authorization");
+
+    if (authHeader === "Bearer expired_access_token") {
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED", message: "Token expired" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // The retried request fails for a reason unrelated to authentication.
+    return new Response(
+      JSON.stringify({ error: "INTERNAL_SERVER_ERROR", message: "Database unavailable" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }) as typeof globalThis.fetch;
+
+  try {
+    await assert.rejects(
+      async () => {
+        await apiFetch("/api/workspaces");
+      },
+      (err: any) => {
+        assert.ok(err instanceof ApiError);
+        assert.equal(err.statusCode, 500);
+        assert.equal(err.message, "Database unavailable");
+        return true;
+      },
+    );
+
+    assert.equal(refreshCallCount, 1);
+
+    // The session survives: refreshed tokens stay in place and nobody is signed out.
+    assert.equal(getStoredToken(), "fresh_access_token");
+    assert.equal(getStoredRefreshToken(), "fresh_refresh_token");
+    assert.equal(revocationCount, 0);
+  } finally {
+    unsubscribe();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("@devforge/web: Logout — Sends Bearer Token, Clears Tokens & Notifies Exactly Once", async () => {
+  setupMockLocalStorage();
+  clearStoredTokens();
+
+  setStoredToken("valid_access_token");
+  setStoredRefreshToken("valid_refresh_token");
+
+  let revocationCount = 0;
+  const unsubscribe = onAuthRevoked(() => {
+    revocationCount++;
+  });
+
+  const logoutRequests: Array<{ method: string | undefined; authorization: string | null }> = [];
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === "/api/auth/logout") {
+      logoutRequests.push({
+        method: init?.method,
+        authorization: new Headers(init?.headers).get("Authorization"),
+      });
+      return new Response(null, { status: 204 });
+    }
+
+    return new Response("Not found", { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    await logoutSession();
+
+    assert.deepEqual(logoutRequests, [
+      { method: "POST", authorization: "Bearer valid_access_token" },
+    ]);
+    assert.equal(getStoredToken(), null);
+    assert.equal(getStoredRefreshToken(), null);
+    assert.equal(revocationCount, 1);
+  } finally {
+    unsubscribe();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("@devforge/web: Logout — Expired Access Token Is Refreshed So The Real Session Gets Revoked", async () => {
+  setupMockLocalStorage();
+  clearStoredTokens();
+
+  setStoredToken("expired_access_token");
+  setStoredRefreshToken("valid_refresh_token");
+
+  let revocationCount = 0;
+  const unsubscribe = onAuthRevoked(() => {
+    revocationCount++;
+  });
+
+  let refreshCallCount = 0;
+  const logoutAuthHeaders: Array<string | null> = [];
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+
+    if (url === "/api/auth/refresh") {
+      refreshCallCount++;
+      return new Response(
+        JSON.stringify({
+          data: { accessToken: "fresh_access_token", refreshToken: "fresh_refresh_token" },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    if (url === "/api/auth/logout") {
+      const authHeader = new Headers(init?.headers).get("Authorization");
+      logoutAuthHeaders.push(authHeader);
+
+      if (authHeader === "Bearer fresh_access_token") {
+        return new Response(null, { status: 204 });
+      }
+
+      return new Response(JSON.stringify({ error: "UNAUTHORIZED", message: "Token expired" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response("Not found", { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    await logoutSession();
+
+    assert.equal(refreshCallCount, 1);
+    assert.deepEqual(logoutAuthHeaders, [
+      "Bearer expired_access_token",
+      "Bearer fresh_access_token",
+    ]);
+    assert.equal(getStoredToken(), null);
+    assert.equal(getStoredRefreshToken(), null);
+    assert.equal(revocationCount, 1);
+  } finally {
+    unsubscribe();
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("@devforge/web: Logout — Clears Tokens & Does Not Throw When The Server Says 401", async () => {
+  setupMockLocalStorage();
+  clearStoredTokens();
+
+  // Access token present but no refresh token: the server session is already gone.
+  setStoredToken("stale_access_token");
+
+  let revocationCount = 0;
+  const unsubscribe = onAuthRevoked(() => {
+    revocationCount++;
+  });
+
+  let refreshCallCount = 0;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url === "/api/auth/refresh") {
+      refreshCallCount++;
+      return new Response("Should not be called", { status: 500 });
+    }
+
+    if (url === "/api/auth/logout") {
+      return new Response(
+        JSON.stringify({ error: "SESSION_REVOKED", message: "Session has been revoked." }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response("Not found", { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  try {
+    await assert.doesNotReject(async () => {
+      await logoutSession();
+    });
+
+    assert.equal(refreshCallCount, 0);
+    assert.equal(getStoredToken(), null);
+    assert.equal(getStoredRefreshToken(), null);
+    assert.equal(revocationCount, 1);
+  } finally {
+    unsubscribe();
     globalThis.fetch = originalFetch;
   }
 });

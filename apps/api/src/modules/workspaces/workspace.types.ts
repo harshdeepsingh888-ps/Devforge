@@ -123,3 +123,17 @@ export interface CreateInvitationInput {
   expiresAt: string;
   invitedByUserId: string;
 }
+
+/**
+ * Accepting an invitation flips its status to ACCEPTED and creates the
+ * workspace membership. Repositories must perform both in one atomic unit.
+ */
+export interface AcceptInvitationInput {
+  invitationId: string;
+  membership: AddWorkspaceMemberInput;
+}
+
+export interface AcceptedInvitation {
+  invitation: WorkspaceInvitation;
+  membership: WorkspaceMember;
+}

@@ -142,3 +142,50 @@ export interface UpdateWorkItemInput {
   teamId?: string | null;
   parentId?: string | null;
 }
+
+export type WorkspaceRole = "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER";
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+
+/** The API never exposes the token hash; the raw token appears only in CreatedInvitation. */
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  expiresAt: string;
+  invitedByUserId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatedInvitation {
+  invitation: WorkspaceInvitation;
+  /** Shown once. Share it as a link; it cannot be retrieved again. */
+  token: string;
+}
+
+export interface InvitationPreview extends WorkspaceInvitation {
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+export interface AcceptedInvitation {
+  workspace: {
+    id: string;
+    name: string;
+    slug: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  membership: {
+    workspaceId: string;
+    userId: string;
+    role: WorkspaceRole;
+    joinedAt: string;
+  };
+}

@@ -15,6 +15,8 @@ export interface AuthModuleConfiguration {
 export interface AuthenticationModule {
   authenticationService: AuthenticationService;
   accessTokenService: JwtAccessTokenService;
+  /** Shared so other modules (invitations) resolve users without a second repository instance. */
+  userRepository: PrismaUserRepository;
 }
 
 export function createAuthenticationModule(
@@ -61,5 +63,6 @@ export function createAuthenticationModule(
   return {
     authenticationService,
     accessTokenService,
+    userRepository: users,
   };
 }

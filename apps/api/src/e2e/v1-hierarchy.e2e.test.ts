@@ -28,7 +28,7 @@ test("V1 Complete Architecture & Security Verification Lifecycle", async () => {
   // Setup repositories & services
   const workspaceRepo = new InMemoryWorkspaceRepository();
   const teamRepo = new InMemoryTeamRepository();
-  const invitationRepo = new InMemoryInvitationRepository();
+  const invitationRepo = new InMemoryInvitationRepository(workspaceRepo);
   const userRepo = new InMemoryUserRepository();
   const projectRepo = new InMemoryProjectRepository();
 

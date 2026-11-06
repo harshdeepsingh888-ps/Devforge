@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import type { Project, Workspace } from "../types/api.types";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { MembersPanel } from "../components/workspace/MembersPanel";
 
 interface AppShellProps {
   workspace: Workspace;
@@ -29,6 +30,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   children,
 }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
 
   const handleSelectProject = (project: Project) => {
     onSelectProject(project);
@@ -45,8 +47,27 @@ export const AppShell: React.FC<AppShellProps> = ({
         onSelectProject={onSelectProject}
         onSwitchWorkspace={onSwitchWorkspace}
         onLogout={onLogout}
+        onOpenMembers={() => setIsMembersOpen(true)}
         onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
       />
+
+      {/* MEMBERS & INVITATIONS DRAWER */}
+      {isMembersOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <button
+            type="button"
+            aria-label="Close members panel"
+            onClick={() => setIsMembersOpen(false)}
+            className="fixed inset-0 bg-[#0a0a0a]/40"
+          />
+          <div className="relative ml-auto flex h-full w-[420px] max-w-[90%] flex-col border-l border-[#d5d9e2] dark:border-white/[0.08] bg-white shadow-2xl">
+            <MembersPanel
+              workspace={workspace}
+              onClose={() => setIsMembersOpen(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         {/* DESKTOP SIDEBAR */}

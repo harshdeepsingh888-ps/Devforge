@@ -7,7 +7,10 @@ import {
 } from "../services/api-client";
 
 import type {
+  AcceptedInvitation,
   Comment,
+  CreatedInvitation,
+  InvitationPreview,
   Project,
   ProjectStatus,
   Team,
@@ -19,7 +22,9 @@ import type {
   Workflow,
   WorkflowDetails,
   Workspace,
+  WorkspaceInvitation,
   WorkspaceMember,
+  WorkspaceRole,
 } from "../types/api.types";
 
 export interface AuthUser {
@@ -337,6 +342,55 @@ export const api = {
     return apiFetch<Team>(`/api/workspaces/${workspaceId}/teams`, {
       method: "POST",
       body: JSON.stringify({ name }),
+    });
+  },
+
+  /*
+   * INVITATIONS
+   *
+   * Tokens are sent in request bodies only; the API logs request URLs.
+   */
+
+  async getInvitations(workspaceId: string): Promise<WorkspaceInvitation[]> {
+    return apiFetch<WorkspaceInvitation[]>(
+      `/api/workspaces/${workspaceId}/invitations`,
+    );
+  },
+
+  async createInvitation(
+    workspaceId: string,
+    input: { email: string; role: WorkspaceRole; expiresInDays?: number },
+  ): Promise<CreatedInvitation> {
+    return apiFetch<CreatedInvitation>(
+      `/api/workspaces/${workspaceId}/invitations`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  },
+
+  async revokeInvitation(
+    workspaceId: string,
+    invitationId: string,
+  ): Promise<WorkspaceInvitation> {
+    return apiFetch<WorkspaceInvitation>(
+      `/api/workspaces/${workspaceId}/invitations/${invitationId}`,
+      { method: "DELETE" },
+    );
+  },
+
+  async lookupInvitation(token: string): Promise<InvitationPreview> {
+    return apiFetch<InvitationPreview>("/api/invitations/lookup", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  async acceptInvitation(token: string): Promise<AcceptedInvitation> {
+    return apiFetch<AcceptedInvitation>("/api/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token }),
     });
   },
 };

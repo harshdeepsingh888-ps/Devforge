@@ -141,3 +141,12 @@ export class InvitationCannotBeRevokedError extends Error {
     this.name = "InvitationCannotBeRevokedError";
   }
 }
+
+export class InvitationEmailMismatchError extends Error {
+  readonly code = "INVITATION_EMAIL_MISMATCH";
+
+  constructor() {
+    super("This invitation was sent to a different email address.");
+    this.name = "InvitationEmailMismatchError";
+  }
+}

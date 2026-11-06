@@ -24,9 +24,11 @@ const authenticationModule = createAuthenticationModule(
 );
 
 import { PrismaTeamRepository } from "./modules/workspaces/repositories/prisma/prisma-team.repository.js";
+import { PrismaInvitationRepository } from "./modules/workspaces/repositories/prisma/prisma-invitation.repository.js";
 
 const workspaceRepository = new PrismaWorkspaceRepository();
 const teamRepository = new PrismaTeamRepository(prisma);
+const invitationRepository = new PrismaInvitationRepository(prisma);
 const projectRepository = new PrismaProjectRepository();
 const workItemRepository = new PrismaWorkItemRepository();
 const workflowRepository = new PrismaWorkflowRepository();
@@ -48,6 +50,8 @@ const app = buildApp({
   accessTokenService: authenticationModule.accessTokenService,
   workspaceRepository,
   teamRepository,
+  userRepository: authenticationModule.userRepository,
+  invitationRepository,
   projectRepository,
   workItemRepository,
   workflowRepository,

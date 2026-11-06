@@ -16,11 +16,12 @@ import {
   InvitationAlreadyAcceptedError,
   InvitationAlreadyPendingError,
   InvitationCannotBeRevokedError,
+  InvitationEmailMismatchError,
 } from "../workspace.errors.js";
 
 async function setupTestContext() {
   const workspaceRepo = new InMemoryWorkspaceRepository();
-  const invitationRepo = new InMemoryInvitationRepository();
+  const invitationRepo = new InMemoryInvitationRepository(workspaceRepo);
   const userRepo = new InMemoryUserRepository();
 
   const workspaceService = new WorkspaceService(workspaceRepo);
@@ -230,34 +231,146 @@ test("token security: raw token is never persisted in DB and tokenHash is stored
 });
 
 test("acceptInvitation transitions invitation to ACCEPTED and grants workspace membership", async () => {
-  const { ws1, invitationService, workspaceRepo } = await setupTestContext();
+  const { ws1, invitationService, invitationRepo, userRepo, workspaceRepo } =
+    await setupTestContext();
+
+  const newHire = await userRepo.create({
+    email: "new-hire@.com",
+    passwordHash: "hash",
+    displayName: "New Hire",
+  });
 
   const createResult = await invitationService.createInvitation({
     workspaceId: ws1.id,
     actorUserId: "owner-1",
-    email: "new-hire@.com",
+    email: "New-Hire@.com",
     role: "DEVELOPER",
   });
 
   const membership = await invitationService.acceptInvitation({
     rawToken: createResult.rawToken,
-    acceptingUserId: "new-hire-user-id",
+    acceptingUserId: newHire.id,
   });
 
   assert.equal(membership.workspaceId, ws1.id);
-  assert.equal(membership.userId, "new-hire-user-id");
+  assert.equal(membership.userId, newHire.id);
   assert.equal(membership.role, "DEVELOPER");
+
+  // Both sides of the atomic accept are persisted
+  const stored = await invitationRepo.findById(ws1.id, createResult.invitation.id);
+  assert.equal(stored?.status, "ACCEPTED");
+  const persistedMembership = await workspaceRepo.findMembership(ws1.id, newHire.id);
+  assert.equal(persistedMembership?.role, "DEVELOPER");
 
   // Re-accepting throws InvitationAlreadyAcceptedError
   await assert.rejects(
     async () => {
       await invitationService.acceptInvitation({
         rawToken: createResult.rawToken,
-        acceptingUserId: "new-hire-user-id",
+        acceptingUserId: newHire.id,
       });
     },
     InvitationAlreadyAcceptedError,
   );
+});
+
+test("acceptInvitation rejects a user whose account email does not match the invitation", async () => {
+  const { ws1, invitationService, invitationRepo, userRepo, workspaceRepo } =
+    await setupTestContext();
+
+  const intruder = await userRepo.create({
+    email: "someone-else@.com",
+    passwordHash: "hash",
+    displayName: "Someone Else",
+  });
+
+  const createResult = await invitationService.createInvitation({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    email: "intended@.com",
+    role: "DEVELOPER",
+  });
+
+  await assert.rejects(
+    async () => {
+      await invitationService.acceptInvitation({
+        rawToken: createResult.rawToken,
+        acceptingUserId: intruder.id,
+      });
+    },
+    InvitationEmailMismatchError,
+  );
+
+  // An unknown user id is rejected the same way, without leaking which case it is
+  await assert.rejects(
+    async () => {
+      await invitationService.acceptInvitation({
+        rawToken: createResult.rawToken,
+        acceptingUserId: "no-such-user",
+      });
+    },
+    InvitationEmailMismatchError,
+  );
+
+  // Nothing was consumed or granted
+  const stored = await invitationRepo.findById(ws1.id, createResult.invitation.id);
+  assert.equal(stored?.status, "PENDING");
+  assert.equal(await workspaceRepo.findMembership(ws1.id, intruder.id), null);
+});
+
+test("acceptInvitation by an existing member consumes the invitation and keeps the current role", async () => {
+  const { ws1, invitationService, invitationRepo, userRepo, workspaceService } =
+    await setupTestContext();
+
+  const member = await userRepo.create({
+    email: "already-here@.com",
+    passwordHash: "hash",
+    displayName: "Already Here",
+  });
+
+  // Invite first, then add directly before the invitation is redeemed
+  const createResult = await invitationService.createInvitation({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    email: "already-here@.com",
+    role: "VIEWER",
+  });
+
+  await workspaceService.addMember({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    targetUserId: member.id,
+    role: "ADMIN",
+  });
+
+  const membership = await invitationService.acceptInvitation({
+    rawToken: createResult.rawToken,
+    acceptingUserId: member.id,
+  });
+
+  // The direct ADMIN grant is not downgraded by a VIEWER invitation
+  assert.equal(membership.role, "ADMIN");
+  const stored = await invitationRepo.findById(ws1.id, createResult.invitation.id);
+  assert.equal(stored?.status, "ACCEPTED");
+});
+
+test("getInvitationByToken returns a preview with the workspace and no token hash", async () => {
+  const { ws1, invitationService } = await setupTestContext();
+
+  const createResult = await invitationService.createInvitation({
+    workspaceId: ws1.id,
+    actorUserId: "owner-1",
+    email: "preview@.com",
+    role: "DEVELOPER",
+  });
+
+  const preview = await invitationService.getInvitationByToken(createResult.rawToken);
+
+  assert.equal(preview.workspace.id, ws1.id);
+  assert.equal(preview.workspace.name, ws1.name);
+  assert.equal(preview.workspace.slug, ws1.slug);
+  assert.equal(preview.email, "preview@.com");
+  assert.equal("tokenHash" in preview, false);
 });
 
 test("acceptInvitation rejects expired and revoked tokens", async () => {
@@ -281,6 +394,10 @@ test("acceptInvitation rejects expired and revoked tokens", async () => {
     },
     InvitationExpiredError,
   );
+
+  // Lazy expiry is persisted so later lookups short-circuit
+  const expiredStored = await invitationRepo.findById(ws1.id, expiredResult.invitation.id);
+  assert.equal(expiredStored?.status, "EXPIRED");
 
   // Revoked token test
   const revokedResult = await invitationService.createInvitation({

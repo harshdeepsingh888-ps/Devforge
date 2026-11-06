@@ -1,14 +1,27 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  AcceptInvitationInput,
+  AcceptedInvitation,
   CreateInvitationInput,
   InvitationStatus,
   WorkspaceInvitation,
 } from "../../workspace.types.js";
 import type { InvitationRepository } from "../invitation.repository.js";
+import type { WorkspaceRepository } from "../../workspace.repository.js";
+import { WorkspaceMembershipAlreadyExistsError } from "../../workspace.errors.js";
 
 export class InMemoryInvitationRepository implements InvitationRepository {
   private readonly invitations = new Map<string, WorkspaceInvitation>();
+
+  /**
+   * Accepting an invitation writes a membership, which lives in the
+   * workspace repository. The Prisma implementation does this in one
+   * transaction; here the two in-memory maps are updated back to back.
+   */
+  constructor(
+    private readonly workspaceRepository?: WorkspaceRepository | undefined,
+  ) {}
 
   async create(input: CreateInvitationInput): Promise<WorkspaceInvitation> {
     const timestamp = new Date().toISOString();
@@ -97,5 +110,37 @@ export class InMemoryInvitationRepository implements InvitationRepository {
 
     this.invitations.set(invitationId, updated);
     return updated;
+  }
+
+  async accept(input: AcceptInvitationInput): Promise<AcceptedInvitation | null> {
+    if (!this.workspaceRepository) {
+      throw new Error(
+        "InMemoryInvitationRepository needs a WorkspaceRepository to accept invitations.",
+      );
+    }
+
+    const invitation = this.invitations.get(input.invitationId);
+    if (!invitation || invitation.status !== "PENDING") {
+      return null;
+    }
+
+    const existingMembership = await this.workspaceRepository.findMembership(
+      input.membership.workspaceId,
+      input.membership.userId,
+    );
+    if (existingMembership) {
+      throw new WorkspaceMembershipAlreadyExistsError();
+    }
+
+    const membership = await this.workspaceRepository.addMember(input.membership);
+
+    const accepted: WorkspaceInvitation = {
+      ...invitation,
+      status: "ACCEPTED",
+      updatedAt: new Date().toISOString(),
+    };
+    this.invitations.set(accepted.id, accepted);
+
+    return { invitation: accepted, membership };
   }
 }

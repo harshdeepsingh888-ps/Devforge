@@ -28,6 +28,15 @@ import { workspaceRoutes } from "./modules/workspaces/routes/workspace.routes.js
 import { InMemoryTeamRepository } from "./modules/workspaces/repositories/memory/in-memory-team.repository.js";
 import type { TeamRepository } from "./modules/workspaces/repositories/team.repository.js";
 import { TeamService } from "./modules/workspaces/services/team.service.js";
+import { InMemoryInvitationRepository } from "./modules/workspaces/repositories/memory/in-memory-invitation.repository.js";
+import type { InvitationRepository } from "./modules/workspaces/repositories/invitation.repository.js";
+import { InvitationService } from "./modules/workspaces/services/invitation.service.js";
+import {
+  invitationRoutes,
+  workspaceInvitationRoutes,
+} from "./modules/workspaces/routes/invitation.routes.js";
+import { InMemoryUserRepository } from "./modules/auth/repositories/memory/in-memory-user.repository.js";
+import type { UserRepository } from "./modules/auth/repositories/user.repository.js";
 import { InMemoryWorkflowRepository } from "./modules/work-management/repositories/memory/in-memory-workflow.repository.js";
 import type { WorkflowRepository } from "./modules/work-management/repositories/workflow.repository.js";
 import { InMemoryWorkItemRepository } from "./modules/work-management/repositories/memory/in-memory-work-item.repository.js";
@@ -103,6 +112,9 @@ export interface BuildAppOptions {
   workspaceService?: WorkspaceService;
   teamRepository?: TeamRepository;
   teamService?: TeamService;
+  userRepository?: UserRepository;
+  invitationRepository?: InvitationRepository;
+  invitationService?: InvitationService;
   workflowRepository?: WorkflowRepository;
   workItemRepository?: WorkItemRepository;
   commentRepository?: CommentRepository;
@@ -174,6 +186,21 @@ export function buildApp(
   const teamService =
     options.teamService ??
     new TeamService(teamRepository, workspaceRepository);
+
+  const userRepository =
+    options.userRepository ?? new InMemoryUserRepository();
+
+  const invitationRepository =
+    options.invitationRepository ??
+    new InMemoryInvitationRepository(workspaceRepository);
+
+  const invitationService =
+    options.invitationService ??
+    new InvitationService(
+      invitationRepository,
+      workspaceRepository,
+      userRepository,
+    );
 
   const workflowRepository =
     options.workflowRepository ?? new InMemoryWorkflowRepository();
@@ -301,6 +328,11 @@ export function buildApp(
           name: "Workspaces",
           description:
             "DevForge organization & multi-tenant workspace management endpoints.",
+        },
+        {
+          name: "Invitations",
+          description:
+            "Workspace invitation lifecycle: invite, list, revoke, preview, and accept.",
         },
         {
           name: "Projects",
@@ -452,6 +484,24 @@ export function buildApp(
           prefix: "/api/workspaces",
           service: workspaceService,
           teamService,
+        },
+      );
+
+      await application.register(
+        workspaceInvitationRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId/invitations",
+          workspaceService,
+          invitationService,
+        },
+      );
+
+      await application.register(
+        invitationRoutes,
+        {
+          prefix: "/api/invitations",
+          workspaceService,
+          invitationService,
         },
       );
 

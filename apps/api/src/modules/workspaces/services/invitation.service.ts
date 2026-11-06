@@ -4,6 +4,7 @@ import type { InvitationRepository } from "../repositories/invitation.repository
 import type { WorkspaceRepository } from "../workspace.repository.js";
 import type { UserRepository } from "../../auth/repositories/user.repository.js";
 import type {
+  Workspace,
   WorkspaceInvitation,
   WorkspaceMember,
   WorkspaceRole,
@@ -18,9 +19,15 @@ import {
   InvitationAlreadyAcceptedError,
   InvitationAlreadyPendingError,
   InvitationCannotBeRevokedError,
+  InvitationEmailMismatchError,
 } from "../workspace.errors.js";
 
 export type SafeWorkspaceInvitation = Omit<WorkspaceInvitation, "tokenHash">;
+
+/** What an invitee may see before accepting: the invitation plus the workspace it opens. */
+export interface InvitationPreview extends SafeWorkspaceInvitation {
+  workspace: Pick<Workspace, "id" | "name" | "slug">;
+}
 
 export function toSafeInvitation(
   invitation: WorkspaceInvitation,
@@ -70,8 +77,40 @@ export class InvitationService {
   constructor(
     private readonly invitationRepository: InvitationRepository,
     private readonly workspaceRepository: WorkspaceRepository,
-    private readonly userRepository?: UserRepository | undefined,
+    private readonly userRepository: UserRepository,
   ) {}
+
+  /**
+   * Shared state checks for a token-addressed invitation. Lazily marks a
+   * PENDING invitation EXPIRED once its expiry has passed.
+   */
+  private async loadPendingInvitation(rawToken: string): Promise<WorkspaceInvitation> {
+    const tokenHash = hashToken(rawToken);
+    const invitation = await this.invitationRepository.findByTokenHash(tokenHash);
+
+    if (!invitation) {
+      throw new InvitationNotFoundError();
+    }
+
+    if (invitation.status === "PENDING" && new Date(invitation.expiresAt) < new Date()) {
+      await this.invitationRepository.updateStatus(invitation.id, "EXPIRED");
+      throw new InvitationExpiredError();
+    }
+
+    if (invitation.status === "EXPIRED") {
+      throw new InvitationExpiredError();
+    }
+
+    if (invitation.status === "REVOKED") {
+      throw new InvitationRevokedError();
+    }
+
+    if (invitation.status === "ACCEPTED") {
+      throw new InvitationAlreadyAcceptedError();
+    }
+
+    return invitation;
+  }
 
   private async assertAdminOrOwnerActor(
     workspaceId: string,
@@ -113,16 +152,14 @@ export class InvitationService {
     const normalizedEmail = params.email.toLowerCase().trim();
 
     // Check if target user is already a member of the workspace
-    if (this.userRepository) {
-      const existingUser = await this.userRepository.findByEmail(normalizedEmail);
-      if (existingUser) {
-        const existingMembership = await this.workspaceRepository.findMembership(
-          params.workspaceId,
-          existingUser.id,
-        );
-        if (existingMembership) {
-          throw new WorkspaceMembershipAlreadyExistsError();
-        }
+    const existingUser = await this.userRepository.findByEmail(normalizedEmail);
+    if (existingUser) {
+      const existingMembership = await this.workspaceRepository.findMembership(
+        params.workspaceId,
+        existingUser.id,
+      );
+      if (existingMembership) {
+        throw new WorkspaceMembershipAlreadyExistsError();
       }
     }
 
@@ -163,61 +200,47 @@ export class InvitationService {
     };
   }
 
-  async getInvitationByToken(rawToken: string): Promise<SafeWorkspaceInvitation> {
-    const tokenHash = hashToken(rawToken);
-    const invitation = await this.invitationRepository.findByTokenHash(tokenHash);
+  async getInvitationByToken(rawToken: string): Promise<InvitationPreview> {
+    const invitation = await this.loadPendingInvitation(rawToken);
 
-    if (!invitation) {
+    const workspace = await this.workspaceRepository.findById(invitation.workspaceId);
+    if (!workspace) {
+      // The workspace was deleted; cascades should have removed the
+      // invitation too, so treat the token as unknown.
       throw new InvitationNotFoundError();
     }
 
-    if (invitation.status === "PENDING" && new Date(invitation.expiresAt) < new Date()) {
-      await this.invitationRepository.updateStatus(invitation.id, "EXPIRED");
-      throw new InvitationExpiredError();
-    }
+    return {
+      ...toSafeInvitation(invitation),
+      workspace: { id: workspace.id, name: workspace.name, slug: workspace.slug },
+    };
+  }
 
-    if (invitation.status === "EXPIRED") {
-      throw new InvitationExpiredError();
-    }
+  /**
+   * Security rule: the invitation is addressed to an email, so only the
+   * account registered with that email may redeem it. Otherwise the raw
+   * token would be a bearer capability for anyone who sees the link.
+   */
+  private async assertAcceptingUserMatches(
+    invitation: WorkspaceInvitation,
+    acceptingUserId: string,
+  ): Promise<void> {
+    const user = await this.userRepository.findById(acceptingUserId);
 
-    if (invitation.status === "REVOKED") {
-      throw new InvitationRevokedError();
+    if (!user || user.email.toLowerCase().trim() !== invitation.email) {
+      throw new InvitationEmailMismatchError();
     }
-
-    if (invitation.status === "ACCEPTED") {
-      throw new InvitationAlreadyAcceptedError();
-    }
-
-    return toSafeInvitation(invitation);
   }
 
   async acceptInvitation(
     params: AcceptInvitationParams,
   ): Promise<WorkspaceMember> {
-    const tokenHash = hashToken(params.rawToken);
-    const invitation = await this.invitationRepository.findByTokenHash(tokenHash);
+    const invitation = await this.loadPendingInvitation(params.rawToken);
 
-    if (!invitation) {
-      throw new InvitationNotFoundError();
-    }
+    await this.assertAcceptingUserMatches(invitation, params.acceptingUserId);
 
-    // State Machine & Expiration Enforcement
-    if (invitation.status === "EXPIRED" || (invitation.status === "PENDING" && new Date(invitation.expiresAt) < new Date())) {
-      if (invitation.status === "PENDING") {
-        await this.invitationRepository.updateStatus(invitation.id, "EXPIRED");
-      }
-      throw new InvitationExpiredError();
-    }
-
-    if (invitation.status === "REVOKED") {
-      throw new InvitationRevokedError();
-    }
-
-    if (invitation.status === "ACCEPTED") {
-      throw new InvitationAlreadyAcceptedError();
-    }
-
-    // Check existing workspace membership
+    // Already a member (added directly, or via another invitation): the
+    // invitation is consumed and the existing membership is kept as is.
     const existingMembership = await this.workspaceRepository.findMembership(
       invitation.workspaceId,
       params.acceptingUserId,
@@ -228,16 +251,24 @@ export class InvitationService {
       return existingMembership;
     }
 
-    // Atomic acceptance & workspace membership assignment
-    const membership = await this.workspaceRepository.addMember({
-      workspaceId: invitation.workspaceId,
-      userId: params.acceptingUserId,
-      role: invitation.role,
+    // One atomic unit: flip PENDING -> ACCEPTED and insert the membership.
+    const accepted = await this.invitationRepository.accept({
+      invitationId: invitation.id,
+      membership: {
+        workspaceId: invitation.workspaceId,
+        userId: params.acceptingUserId,
+        role: invitation.role,
+      },
     });
 
-    await this.invitationRepository.updateStatus(invitation.id, "ACCEPTED");
+    if (!accepted) {
+      // Lost a race with a concurrent accept or revoke. Re-read so the
+      // caller gets the precise reason.
+      await this.loadPendingInvitation(params.rawToken);
+      throw new InvitationAlreadyAcceptedError();
+    }
 
-    return membership;
+    return accepted.membership;
   }
 
   async revokeInvitation(

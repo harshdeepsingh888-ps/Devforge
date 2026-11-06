@@ -1,4 +1,6 @@
 import type {
+  AcceptInvitationInput,
+  AcceptedInvitation,
   CreateInvitationInput,
   InvitationStatus,
   WorkspaceInvitation,
@@ -27,4 +29,13 @@ export interface InvitationRepository {
     invitationId: string,
     status: InvitationStatus,
   ): Promise<WorkspaceInvitation | null>;
+
+  /**
+   * Atomically marks a PENDING invitation ACCEPTED and creates the
+   * workspace membership. Returns null when the invitation is no longer
+   * PENDING (for example a concurrent accept or revoke won the race), in
+   * which case nothing is written. Throws
+   * WorkspaceMembershipAlreadyExistsError if the membership already exists.
+   */
+  accept(input: AcceptInvitationInput): Promise<AcceptedInvitation | null>;
 }

@@ -1,5 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createWorkspaceTenantGuard } from "../../workspaces/plugins/workspace-tenant.plugin.js";
+import {
+  createWorkspaceTenantGuard,
+  requireWorkspaceRole,
+} from "../../workspaces/plugins/workspace-tenant.plugin.js";
 import type { WorkspaceService } from "../../workspaces/services/workspace.service.js";
 import { handleCicdError } from "../cicd.error-mapper.js";
 import {
@@ -29,6 +32,9 @@ export const cicdRoutes: FastifyPluginAsync<CicdRoutesOptions> = async (
   const requireWorkspaceMember = createWorkspaceTenantGuard(workspaceService);
   app.addHook("preHandler", requireWorkspaceMember);
 
+  // Writes require DEVELOPER or higher; reads are open to every workspace member.
+  const requireDeveloper = requireWorkspaceRole("DEVELOPER");
+
   // 1. POST /pipelines - Create Pipeline
   app.post<{
     Params: { workspaceId: string };
@@ -38,22 +44,26 @@ export const cicdRoutes: FastifyPluginAsync<CicdRoutesOptions> = async (
       name: string;
       externalId: string;
     };
-  }>("/pipelines", { schema: createPipelineSchema }, async (request, reply) => {
-    const { workspaceId } = request.params;
-    try {
-      const pipeline = await cicdService.createPipeline({
-        workspaceId,
-        projectId: request.body.projectId,
-        provider: request.body.provider ?? "GITHUB_ACTIONS",
-        name: request.body.name,
-        externalId: request.body.externalId,
-      });
+  }>(
+    "/pipelines",
+    { schema: createPipelineSchema, preHandler: [requireDeveloper] },
+    async (request, reply) => {
+      const { workspaceId } = request.params;
+      try {
+        const pipeline = await cicdService.createPipeline({
+          workspaceId,
+          projectId: request.body.projectId,
+          provider: request.body.provider ?? "GITHUB_ACTIONS",
+          name: request.body.name,
+          externalId: request.body.externalId,
+        });
 
-      return reply.code(201).send({ data: pipeline });
-    } catch (error) {
-      return handleCicdError(error, reply);
-    }
-  });
+        return reply.code(201).send({ data: pipeline });
+      } catch (error) {
+        return handleCicdError(error, reply);
+      }
+    },
+  );
 
   // 2. POST /pipelines/:pipelineId/runs - Ingest Pipeline Run
   app.post<{
@@ -69,7 +79,7 @@ export const cicdRoutes: FastifyPluginAsync<CicdRoutesOptions> = async (
     };
   }>(
     "/pipelines/:pipelineId/runs",
-    { schema: ingestPipelineRunSchema },
+    { schema: ingestPipelineRunSchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId, pipelineId } = request.params;
       try {
@@ -119,7 +129,7 @@ export const cicdRoutes: FastifyPluginAsync<CicdRoutesOptions> = async (
     };
   }>(
     "/runs/:runId/deploy",
-    { schema: recordDeploymentSchema },
+    { schema: recordDeploymentSchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId, runId } = request.params;
       try {

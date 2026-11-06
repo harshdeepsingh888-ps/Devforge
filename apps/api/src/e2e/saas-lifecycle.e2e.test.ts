@@ -241,4 +241,33 @@ test("Full SaaS End-to-End Lifecycle: Register -> Auth -> Create Workspace -> Ma
   const projectsList = user2AllowedRes.json().data;
   assert.equal(projectsList.length, 1);
   assert.equal(projectsList[0].id, project.id);
+
+  // 8. User 2 Logs Out -> 204, and the session is revoked server-side
+  const logoutRes = await app.inject({
+    method: "POST",
+    url: "/api/auth/logout",
+    headers: { authorization: `Bearer ${user2Token}` },
+  });
+
+  assert.equal(logoutRes.statusCode, 204);
+
+  // 9. The refresh token issued with that session no longer works
+  const refreshAfterLogoutRes = await app.inject({
+    method: "POST",
+    url: "/api/auth/refresh",
+    payload: { refreshToken: user2Auth.refreshToken },
+  });
+
+  assert.equal(refreshAfterLogoutRes.statusCode, 401);
+  assert.equal(refreshAfterLogoutRes.json().error, "SESSION_REVOKED");
+
+  // 10. Logging out twice is rejected because the session is already revoked
+  const secondLogoutRes = await app.inject({
+    method: "POST",
+    url: "/api/auth/logout",
+    headers: { authorization: `Bearer ${user2Token}` },
+  });
+
+  assert.equal(secondLogoutRes.statusCode, 401);
+  assert.equal(secondLogoutRes.json().error, "SESSION_REVOKED");
 });

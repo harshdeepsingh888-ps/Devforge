@@ -95,6 +95,7 @@ export const projectRoutes: FastifyPluginAsync<
     "/",
     {
       schema: createProjectSchema,
+      preHandler: [requireWorkspaceRole("DEVELOPER")],
     },
     async (request, reply) => {
       const name = request.body.name.trim();
@@ -128,6 +129,7 @@ export const projectRoutes: FastifyPluginAsync<
     "/:projectId/status",
     {
       schema: updateProjectStatusSchema,
+      preHandler: [requireWorkspaceRole("ADMIN")],
     },
     async (request, reply) => {
       const project = await options.repository.updateStatus(

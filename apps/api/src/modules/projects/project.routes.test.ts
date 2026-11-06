@@ -314,3 +314,106 @@ test("DELETE /api/workspaces/:workspaceId/projects/:projectId enforces cross-wor
   assert.equal(nonExistentRes.json().error, "PROJECT_NOT_FOUND");
 });
 
+
+test("POST /api/workspaces/:workspaceId/projects returns 403 for VIEWER and 201 for DEVELOPER", async (t) => {
+  const { app, workspace, workspaceService } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-dev-1",
+    role: "DEVELOPER",
+  });
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-viewer-1",
+    role: "VIEWER",
+  });
+
+  const viewerRes = await app.inject({
+    method: "POST",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: await getAuthHeader("user-viewer-1"),
+    payload: { name: "Viewer Project" },
+  });
+  assert.equal(viewerRes.statusCode, 403);
+  assert.equal(viewerRes.json().error, "FORBIDDEN");
+
+  const devRes = await app.inject({
+    method: "POST",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: await getAuthHeader("user-dev-1"),
+    payload: { name: "Developer Project" },
+  });
+  assert.equal(devRes.statusCode, 201);
+  assert.equal(devRes.json().data.name, "Developer Project");
+
+  // The viewer's rejected request must not have created anything.
+  const listRes = await app.inject({
+    method: "GET",
+    url: `/api/workspaces/${workspace.id}/projects`,
+    headers: await getAuthHeader("user-viewer-1"),
+  });
+  assert.equal(listRes.statusCode, 200);
+  assert.equal(listRes.json().data.length, 1);
+});
+
+test("PATCH /api/workspaces/:workspaceId/projects/:projectId/status requires ADMIN", async (t) => {
+  const { app, workspace, workspaceService, projectRepository } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-admin-1",
+    role: "ADMIN",
+  });
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-dev-1",
+    role: "DEVELOPER",
+  });
+  await workspaceService.addMember({
+    workspaceId: workspace.id,
+    actorUserId: "user-owner-1",
+    targetUserId: "user-viewer-1",
+    role: "VIEWER",
+  });
+
+  const project = await projectRepository.create({
+    workspaceId: workspace.id,
+    name: "Status Guarded Project",
+  });
+
+  for (const userId of ["user-dev-1", "user-viewer-1"]) {
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/workspaces/${workspace.id}/projects/${project.id}/status`,
+      headers: await getAuthHeader(userId),
+      payload: { status: "ARCHIVED" },
+    });
+    assert.equal(res.statusCode, 403, `${userId} should be forbidden`);
+    assert.equal(res.json().error, "FORBIDDEN");
+  }
+
+  const unchanged = await projectRepository.findById(workspace.id, project.id);
+  assert.equal(unchanged?.status, "ACTIVE");
+
+  const adminRes = await app.inject({
+    method: "PATCH",
+    url: `/api/workspaces/${workspace.id}/projects/${project.id}/status`,
+    headers: await getAuthHeader("user-admin-1"),
+    payload: { status: "ARCHIVED" },
+  });
+  assert.equal(adminRes.statusCode, 200);
+  assert.equal(adminRes.json().data.status, "ARCHIVED");
+});

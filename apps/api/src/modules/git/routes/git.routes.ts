@@ -1,5 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createWorkspaceTenantGuard } from "../../workspaces/plugins/workspace-tenant.plugin.js";
+import {
+  createWorkspaceTenantGuard,
+  requireWorkspaceRole,
+} from "../../workspaces/plugins/workspace-tenant.plugin.js";
 import type { WorkspaceService } from "../../workspaces/services/workspace.service.js";
 import { handleGitError } from "../git.error-mapper.js";
 import {
@@ -26,6 +29,9 @@ export const gitRoutes: FastifyPluginAsync<GitRoutesOptions> = async (
   const requireWorkspaceMember = createWorkspaceTenantGuard(workspaceService);
   app.addHook("preHandler", requireWorkspaceMember);
 
+  // Writes require DEVELOPER or higher; reads are open to every workspace member.
+  const requireDeveloper = requireWorkspaceRole("DEVELOPER");
+
   // 1. Create Repository
   app.post<{
     Params: { workspaceId: string };
@@ -37,7 +43,7 @@ export const gitRoutes: FastifyPluginAsync<GitRoutesOptions> = async (
     };
   }>(
     "/repositories",
-    { schema: createRepositorySchema },
+    { schema: createRepositorySchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId } = request.params;
       try {
@@ -69,7 +75,7 @@ export const gitRoutes: FastifyPluginAsync<GitRoutesOptions> = async (
     };
   }>(
     "/repositories/:repoId/commits",
-    { schema: ingestCommitSchema },
+    { schema: ingestCommitSchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId, repoId } = request.params;
       try {
@@ -114,7 +120,7 @@ export const gitRoutes: FastifyPluginAsync<GitRoutesOptions> = async (
     Body: { workItemId: string };
   }>(
     "/commits/:commitId/link/work-items",
-    { schema: linkCommitToWorkItemSchema },
+    { schema: linkCommitToWorkItemSchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId, commitId } = request.params;
       try {
@@ -136,7 +142,7 @@ export const gitRoutes: FastifyPluginAsync<GitRoutesOptions> = async (
     Body: { adrId: string };
   }>(
     "/commits/:commitId/link/adrs",
-    { schema: linkCommitToAdrSchema },
+    { schema: linkCommitToAdrSchema, preHandler: [requireDeveloper] },
     async (request, reply) => {
       const { workspaceId, commitId } = request.params;
       try {

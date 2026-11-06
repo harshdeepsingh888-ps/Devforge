@@ -2,6 +2,16 @@ import type { PrismaClient } from "../../../../generated/prisma/client.js";
 import { prisma } from "../../../../infrastructure/database/prisma.js";
 import type { TeamRepository } from "../team.repository.js";
 import type { CreateTeamInput, Team, TeamMember } from "../../workspace.types.js";
+import { TeamSlugAlreadyExistsError } from "../../workspace.errors.js";
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
 
 type TeamDatabaseClient = Pick<
   PrismaClient,
@@ -31,14 +41,22 @@ export class PrismaTeamRepository implements TeamRepository {
   constructor(private readonly database: TeamDatabaseClient = prisma) {}
 
   async create(input: CreateTeamInput): Promise<Team> {
-    const team = await this.database.team.create({
-      data: {
-        workspaceId: input.workspaceId,
-        name: input.name.trim(),
-        slug: input.slug.trim(),
-      },
-    });
-    return toTeamDomain(team);
+    try {
+      const team = await this.database.team.create({
+        data: {
+          workspaceId: input.workspaceId,
+          name: input.name.trim(),
+          slug: input.slug.trim(),
+        },
+      });
+      return toTeamDomain(team);
+    } catch (error) {
+      // @@unique([workspaceId, slug]) in schema.prisma; mirror the in-memory repository's behaviour.
+      if (isUniqueConstraintViolation(error)) {
+        throw new TeamSlugAlreadyExistsError();
+      }
+      throw error;
+    }
   }
 
   async findById(workspaceId: string, teamId: string): Promise<Team | null> {

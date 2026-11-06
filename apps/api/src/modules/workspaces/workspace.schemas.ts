@@ -47,6 +47,26 @@ const workspaceNotFoundSchema = {
   },
 } as const;
 
+const forbiddenSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["error", "message"],
+  properties: {
+    error: { type: "string", const: "FORBIDDEN" },
+    message: { type: "string" },
+  },
+} as const;
+
+const teamSlugAlreadyExistsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["error", "message"],
+  properties: {
+    error: { type: "string", const: "TEAM_SLUG_ALREADY_EXISTS" },
+    message: { type: "string" },
+  },
+} as const;
+
 const workspaceSlugAlreadyExistsSchema = {
   type: "object",
   additionalProperties: false,
@@ -116,7 +136,8 @@ export const getWorkspaceSchema = {
 export const addWorkspaceMemberSchema = {
   tags: ["Workspaces"],
   summary: "Add a member to a workspace",
-  description: "Adds a user to a workspace with a specified role (OWNER only).",
+  description:
+    "Adds a user to a workspace with a specified role (OWNER or ADMIN; only an OWNER may grant OWNER).",
   params: {
     type: "object",
     additionalProperties: false,
@@ -143,6 +164,7 @@ export const addWorkspaceMemberSchema = {
         data: workspaceMemberSchema,
       },
     },
+    403: forbiddenSchema,
     404: workspaceNotFoundSchema,
   },
 } as const;
@@ -278,6 +300,8 @@ export const createTeamSchema = {
         },
       },
     },
+    403: forbiddenSchema,
     404: workspaceNotFoundSchema,
+    409: teamSlugAlreadyExistsSchema,
   },
 } as const;

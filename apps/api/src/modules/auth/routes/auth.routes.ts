@@ -14,10 +14,11 @@ import type {
   RegisterInput,
 } from "../authentication.types.js";
 import type { AuthenticationService } from "../services/authentication/authentication.service.js";
+import { requireAuth } from "../guards/require-auth.guard.js";
 
 export type AuthenticationServiceContract = Pick<
   AuthenticationService,
-  "register" | "login" | "refresh"
+  "register" | "login" | "refresh" | "logout"
 >;
 
 export interface AuthRoutesOptions {
@@ -215,6 +216,21 @@ const refreshSchema = {
   },
 } as const;
 
+const logoutSchema = {
+  tags: ["Authentication"],
+  summary: "Log out of the current session",
+  description:
+    "Revokes the session identified by the bearer access token. The session's refresh token stops working immediately; the access token itself expires on its own.",
+  security: [{ bearerAuth: [] }],
+  response: {
+    204: {
+      type: "null",
+      description: "Session revoked.",
+    },
+    401: errorResponseSchema,
+  },
+} as const;
+
 export const authRoutes: FastifyPluginAsync<
   AuthRoutesOptions
 > = async (app, options) => {
@@ -301,6 +317,44 @@ export const authRoutes: FastifyPluginAsync<
             SessionNotFoundError ||
           error instanceof
             SessionRevokedError
+        ) {
+          return reply.code(401).send({
+            error: error.code,
+            message: error.message,
+            requestId: request.id,
+          });
+        }
+
+        throw error;
+      }
+    },
+  );
+
+  app.post(
+    "/logout",
+    {
+      schema: logoutSchema,
+      preHandler: [requireAuth],
+    },
+    async (request, reply) => {
+      // requireAuth guarantees request.auth is present here.
+      const { sessionId, userId } = request.auth!;
+
+      try {
+        await options.authenticationService.logout({
+          sessionId,
+          userId,
+        });
+
+        return reply.code(204).send();
+      } catch (error) {
+        if (
+          error instanceof
+            SessionNotFoundError ||
+          error instanceof
+            SessionRevokedError ||
+          error instanceof
+            SessionExpiredError
         ) {
           return reply.code(401).send({
             error: error.code,

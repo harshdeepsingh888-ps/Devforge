@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: devforge_user
-      POSTGRES_PASSWORD: devforge@2005
+      POSTGRES_PASSWORD: devforge_dev_password
       POSTGRES_DB: devforge
     ports:
       - '5432:5432'

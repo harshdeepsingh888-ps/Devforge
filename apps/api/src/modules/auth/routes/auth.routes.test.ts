@@ -7,14 +7,26 @@ import {
   InvalidCredentialsError,
   InvalidRefreshTokenError,
   SessionExpiredError,
+  SessionRevokedError,
 } from "../authentication.errors.js";
 import type {
   AuthenticationResult,
   LoginInput,
+  LogoutInput,
   RefreshInput,
   RegisterInput,
 } from "../authentication.types.js";
+import { JwtAccessTokenService } from "../security/jwt.service.js";
 import type { AuthenticationServiceContract } from "./auth.routes.js";
+
+// Matches the DEFAULT_JWT_SECRET that buildApp() falls back to when no
+// accessTokenService is supplied, so issued tokens verify inside the app.
+const accessTokens = new JwtAccessTokenService({
+  secret: "devforge-default-development-jwt-signing-secret-key-32bytes",
+  issuer: "devforge",
+  audience: "devforge-api",
+  expiresInSeconds: 900,
+});
 
 const AUTHENTICATION_RESULT:
   AuthenticationResult = {
@@ -36,6 +48,7 @@ interface FakeAuthenticationServiceOptions {
   registerError?: Error;
   loginError?: Error;
   refreshError?: Error;
+  logoutError?: Error;
 }
 
 class FakeAuthenticationService
@@ -43,7 +56,8 @@ class FakeAuthenticationService
 {
   registerCalls: RegisterInput[] = [];
   loginCalls: LoginInput[] = [];
-    refreshCalls: RefreshInput[] = [];
+  refreshCalls: RefreshInput[] = [];
+  logoutCalls: LogoutInput[] = [];
 
   constructor(
     private readonly options:
@@ -84,6 +98,16 @@ class FakeAuthenticationService
     }
 
     return AUTHENTICATION_RESULT;
+  }
+
+  async logout(
+    input: LogoutInput,
+  ): Promise<void> {
+    this.logoutCalls.push(input);
+
+    if (this.options.logoutError) {
+      throw this.options.logoutError;
+    }
   }
 }
 
@@ -664,4 +688,102 @@ test("POST /api/auth/refresh rejects unknown properties", async (t) => {
     authenticationService.refreshCalls.length,
     0,
   );
+});
+
+test("POST /api/auth/logout returns 401 without a bearer token", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/logout",
+  });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.json().error, "UNAUTHORIZED");
+  assert.deepEqual(authenticationService.logoutCalls, []);
+});
+
+test("POST /api/auth/logout revokes the session named by the access token", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService();
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const accessToken = await accessTokens.issue({
+    userId: "user-123",
+    sessionId: "session-42",
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/logout",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 204);
+  assert.equal(response.body, "");
+
+  assert.deepEqual(authenticationService.logoutCalls, [
+    {
+      sessionId: "session-42",
+      userId: "user-123",
+    },
+  ]);
+});
+
+test("POST /api/auth/logout returns 401 when the session is already revoked", async (t) => {
+  const authenticationService =
+    new FakeAuthenticationService({
+      logoutError: new SessionRevokedError(),
+    });
+
+  const app = buildApp({
+    serverOptions: {
+      logger: false,
+    },
+    authenticationService,
+  });
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const accessToken = await accessTokens.issue({
+    userId: "user-123",
+    sessionId: "session-42",
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/auth/logout",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.json().error, "SESSION_REVOKED");
 });

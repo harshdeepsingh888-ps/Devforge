@@ -12,6 +12,8 @@ import {
   onAuthRevoked,
 } from "./services/api-client";
 
+import { readInvitationTokenFromSearch } from "./services/invitations";
+
 import { AppShell } from "./layout/AppShell";
 import { AuthGate } from "./pages/AuthGate";
 import { ProjectGate } from "./pages/ProjectGate";
@@ -24,6 +26,31 @@ import type {
 } from "./types/api.types";
 
 export const App: React.FC = () => {
+  /*
+   * PENDING INVITATION
+   *
+   * An opened invite link carries ?invite=<token>. It is read once here,
+   * stripped from the address bar so it does not linger in history, and
+   * held until the user accepts or signs out. It lives in App rather than
+   * in WorkspaceGate because that gate mounts, unmounts while workspaces
+   * load, and mounts again.
+   */
+  const [pendingInvitationToken, setPendingInvitationToken] = useState<
+    string | null
+  >(() => readInvitationTokenFromSearch(window.location.search));
+
+  /*
+   * The initializer above must stay pure: React StrictMode runs it twice
+   * in development, and stripping the URL inside it would make the second
+   * run read nothing. Removing the token from the address bar is a side
+   * effect, so it lives here (harmless if it runs twice).
+   */
+  useEffect(() => {
+    if (pendingInvitationToken && window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [pendingInvitationToken]);
+
   /*
    * AUTHENTICATION
    *
@@ -75,6 +102,7 @@ export const App: React.FC = () => {
    */
   useEffect(() => {
     const unsubscribe = onAuthRevoked(() => {
+      setPendingInvitationToken(null);
       setIsAuthenticated(false);
       setWorkspaces([]);
       setActiveWorkspace(null);
@@ -312,6 +340,30 @@ export const App: React.FC = () => {
   };
 
   /*
+   * WORKSPACE JOINED VIA INVITATION
+   *
+   * The accept response carries the workspace and the new membership.
+   * Like creation, joining is explicit, so the workspace becomes active.
+   */
+  const handleWorkspaceJoined = (
+    workspace: Workspace,
+  ): void => {
+    setWorkspaces((current) =>
+      current.some((item) => item.id === workspace.id)
+        ? current.map((item) =>
+            item.id === workspace.id ? workspace : item,
+          )
+        : [...current, workspace],
+    );
+
+    setPendingInvitationToken(null);
+    setError(null);
+    setProjects([]);
+    setActiveProject(null);
+    setActiveWorkspace(workspace);
+  };
+
+  /*
    * PROJECT CREATED
    */
   const handleProjectCreated = (
@@ -461,11 +513,15 @@ export const App: React.FC = () => {
     return (
       <WorkspaceGate
         workspaces={workspaces}
+        initialInvitationToken={pendingInvitationToken}
         onSelectWorkspace={
           handleSelectWorkspace
         }
         onWorkspaceCreated={
           handleWorkspaceCreated
+        }
+        onWorkspaceJoined={
+          handleWorkspaceJoined
         }
       />
     );

@@ -1,17 +1,160 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api/api";
-import type { Workspace } from "../types/api.types";
+import { extractInvitationToken } from "../services/invitations";
+import type { InvitationPreview, Workspace } from "../types/api.types";
 
 interface WorkspaceGateProps {
   workspaces: Workspace[];
+  /** Token taken from an opened invite link; owned by App so it survives this gate remounting. */
+  initialInvitationToken?: string | null;
   onSelectWorkspace: (workspace: Workspace) => void;
   onWorkspaceCreated: (workspace: Workspace) => void;
+  onWorkspaceJoined: (workspace: Workspace) => void;
 }
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
+/**
+ * Invitee side of invitations: paste a link or token, preview the
+ * workspace and role, then accept. When App was opened through an invite
+ * link it passes the token in, and the preview loads automatically.
+ */
+const JoinByInvitation: React.FC<{
+  initialToken?: string | null;
+  onWorkspaceJoined: (workspace: Workspace) => void;
+}> = ({ initialToken, onWorkspaceJoined }) => {
+  const [input, setInput] = useState(initialToken ?? "");
+  const [preview, setPreview] = useState<InvitationPreview | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const lookup = async (candidate: string) => {
+    setIsLookingUp(true);
+    setError(null);
+    setPreview(null);
+    try {
+      const result = await api.lookupInvitation(candidate);
+      setPreview(result);
+      setToken(candidate);
+    } catch (err) {
+      setError(errorMessage(err, "This invitation could not be found."));
+      setToken(null);
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
+  useEffect(() => {
+    if (initialToken) {
+      void lookup(initialToken);
+    }
+    // Runs once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleLookup = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = extractInvitationToken(input);
+    if (!candidate) {
+      setError("Paste the full invitation link or its 64-character token.");
+      return;
+    }
+    void lookup(candidate);
+  };
+
+  const handleAccept = async () => {
+    if (!token || isAccepting) return;
+    setIsAccepting(true);
+    setError(null);
+    try {
+      const accepted = await api.acceptInvitation(token);
+      onWorkspaceJoined({ ...accepted.workspace, membership: accepted.membership });
+    } catch (err) {
+      setError(errorMessage(err, "Failed to accept the invitation."));
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-[#d5d9e2] pt-6">
+      <h2 className="text-xs font-semibold text-[#0a0a0a] font-mono uppercase tracking-wider">
+        Join by invitation
+      </h2>
+
+      <form onSubmit={handleLookup} className="mt-3 flex gap-2">
+        <label htmlFor="invitation-token" className="sr-only">
+          Invitation link or token
+        </label>
+        <input
+          id="invitation-token"
+          type="text"
+          value={input}
+          onChange={(event) => {
+            setInput(event.target.value);
+            if (error) setError(null);
+          }}
+          placeholder="Paste an invitation link"
+          autoComplete="off"
+          spellCheck={false}
+          disabled={isLookingUp || isAccepting}
+          className="w-full rounded-lg border border-[#d5d9e2] bg-white px-3.5 py-2 text-xs text-[#0a0a0a] placeholder:text-[#858585] outline-none transition focus:border-[#0a0a0a] focus:ring-1 focus:ring-[#0a0a0a]/10 font-mono select-text"
+        />
+        <button
+          type="submit"
+          disabled={isLookingUp || isAccepting || !input.trim()}
+          className="shrink-0 rounded-full border border-[#d5d9e2] bg-white px-4 py-2 text-xs font-semibold text-[#0a0a0a] shadow-xs transition hover:border-[#0a0a0a] hover:bg-[#f2ede5] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isLookingUp ? "Checking…" : "Check"}
+        </button>
+      </form>
+
+      {error && (
+        <div
+          role="alert"
+          className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 font-sans"
+        >
+          {error}
+        </div>
+      )}
+
+      {preview && (
+        <div
+          role="status"
+          className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-[#d5d9e2] bg-white px-4 py-3 shadow-xs"
+        >
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-[#0a0a0a]">
+              {preview.workspace.name}
+            </div>
+            <div className="text-[11px] text-[#858585]">
+              Join as {preview.role} · invitation for {preview.email}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleAccept()}
+            disabled={isAccepting}
+            className="shrink-0 rounded-full bg-[#0a0a0a] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#262626] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isAccepting ? "Joining…" : "Accept"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
   workspaces,
+  initialInvitationToken = null,
   onSelectWorkspace,
   onWorkspaceCreated,
+  onWorkspaceJoined,
 }) => {
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,6 +247,11 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
               {isSubmitting ? "Creating..." : "Create Workspace"}
             </button>
           </form>
+
+          <JoinByInvitation
+            initialToken={initialInvitationToken}
+            onWorkspaceJoined={onWorkspaceJoined}
+          />
         </section>
       </main>
     );
@@ -180,6 +328,11 @@ export const WorkspaceGate: React.FC<WorkspaceGateProps> = ({
             </button>
           </form>
         </div>
+
+        <JoinByInvitation
+          initialToken={initialInvitationToken}
+          onWorkspaceJoined={onWorkspaceJoined}
+        />
       </section>
     </main>
   );

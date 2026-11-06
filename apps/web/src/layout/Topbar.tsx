@@ -9,6 +9,7 @@ interface TopbarProps {
   onSelectProject?: (project: Project) => void;
   onSwitchWorkspace: () => void;
   onLogout: () => void | Promise<void>;
+  onOpenMembers: () => void;
   onToggleMobileSidebar?: () => void;
 }
 
@@ -19,6 +20,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onSelectProject,
   onSwitchWorkspace,
   onLogout,
+  onOpenMembers,
   onToggleMobileSidebar,
 }) => {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
@@ -213,6 +215,14 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="hidden sm:inline">Dark</span>
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={onOpenMembers}
+          className="rounded-lg border border-[#d5d9e2] dark:border-white/[0.08] bg-white dark:bg-[#161514] px-3 py-1 text-xs font-medium text-[#0a0a0a] dark:text-[#9e9a93] transition duration-150 hover:border-[#0a0a0a] dark:hover:border-white/20 hover:bg-[#f2ede5] dark:hover:bg-[#1a1918] hover:text-[#0a0a0a] dark:hover:text-white shadow-xs"
+        >
+          Members
+        </button>
 
         <button
           type="button"

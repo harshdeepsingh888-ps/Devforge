@@ -1,6 +1,6 @@
 import {
   apiFetch,
-  clearStoredTokens,
+  logoutSession,
   refreshAuthSession,
   setStoredRefreshToken,
   setStoredToken,
@@ -92,8 +92,13 @@ export const api = {
     return refreshAuthSession();
   },
 
-  logout(): void {
-    clearStoredTokens();
+  /*
+   * Revokes the server session, clears local tokens and notifies
+   * auth-revoked listeners so the app returns to the sign-in screen.
+   * Never throws: local sign-out succeeds even if the server is unreachable.
+   */
+  async logout(): Promise<void> {
+    await logoutSession();
   },
 
   /*

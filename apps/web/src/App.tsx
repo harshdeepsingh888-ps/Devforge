@@ -382,6 +382,17 @@ export const App: React.FC = () => {
   };
 
   /*
+   * LOGOUT
+   *
+   * api.logout revokes the server session, clears tokens and fires the
+   * auth-revoked event; the listener above resets all app state.
+   */
+  const handleLogout = async (): Promise<void> => {
+    setError(null);
+    await api.logout();
+  };
+
+  /*
    * GATE 0 — AUTHENTICATION
    */
   if (!isAuthenticated) {
@@ -500,6 +511,7 @@ export const App: React.FC = () => {
       onProjectUpdated={handleProjectUpdated}
       onProjectDeleted={handleProjectDeleted}
       onSwitchWorkspace={handleSwitchWorkspace}
+      onLogout={handleLogout}
     >
       <WorkStream
         workspace={activeWorkspace}

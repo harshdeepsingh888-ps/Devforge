@@ -136,6 +136,50 @@ export async function refreshAuthSession(): Promise<string> {
   return activeRefreshPromise;
 }
 
+/**
+ * Ends the current session.
+ *
+ * The revoke request goes through apiFetch on purpose: if the access token has
+ * expired but the refresh token is still valid, the silent refresh runs first
+ * and the retried request revokes the real server session instead of leaving
+ * it active. If the refresh fails, refreshAuthSession has already cleared the
+ * tokens and notified listeners.
+ *
+ * Local sign-out must succeed regardless of what the server says, so request
+ * failures never propagate. A 401 is expected when the session is already
+ * gone; anything else is logged for visibility.
+ */
+export async function logoutSession(): Promise<void> {
+  const hadSession = Boolean(getStoredToken() || getStoredRefreshToken());
+
+  try {
+    if (hadSession) {
+      await apiFetch<void>("/api/auth/logout", { method: "POST" });
+    }
+  } catch (error) {
+    const alreadyRevoked =
+      error instanceof ApiError && error.statusCode === 401;
+
+    if (!alreadyRevoked) {
+      console.warn(
+        "Server-side logout failed; local session cleared anyway.",
+        error,
+      );
+    }
+  } finally {
+    // A failed refresh (or a 401 with no refresh token) has already cleared
+    // the tokens and notified listeners. Only notify once per sign-out.
+    const alreadySignedOut =
+      !getStoredToken() && !getStoredRefreshToken();
+
+    clearStoredTokens();
+
+    if (hadSession && !alreadySignedOut) {
+      notifyAuthRevoked();
+    }
+  }
+}
+
 export interface ApiFetchOptions extends RequestInit {
   _isRetry?: boolean;
 }
@@ -180,26 +224,13 @@ export async function apiFetch<T>(
       const refreshToken = getStoredRefreshToken();
 
       if (refreshToken) {
+        let newAccessToken: string;
+
         try {
-          const newAccessToken = await refreshAuthSession();
-
-          const retryHeaders = new Headers(options.headers);
-          if (
-            options.body !== undefined &&
-            options.body !== null &&
-            !retryHeaders.has("Content-Type")
-          ) {
-            retryHeaders.set("Content-Type", "application/json");
-          }
-          retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
-
-          return await apiFetch<T>(endpoint, {
-            ...options,
-            headers: retryHeaders,
-            _isRetry: true,
-          });
+          newAccessToken = await refreshAuthSession();
         } catch {
-          // If refresh failed, refreshAuthSession already cleared tokens and notified listeners
+          // Refresh failed: refreshAuthSession already cleared tokens and
+          // notified listeners. Surface the original 401 to the caller.
           let errorData: { message?: string; error?: string } = {};
           try {
             errorData = await response.json();
@@ -212,6 +243,28 @@ export async function apiFetch<T>(
 
           throw new ApiError(message, 401, errorData.error);
         }
+
+        /*
+         * Refresh succeeded: retry exactly once. The retried request's own
+         * outcome (including a 403, 404 or 500) propagates unchanged; it is
+         * deliberately outside the try above so it can never be mistaken
+         * for an authentication failure.
+         */
+        const retryHeaders = new Headers(options.headers);
+        if (
+          options.body !== undefined &&
+          options.body !== null &&
+          !retryHeaders.has("Content-Type")
+        ) {
+          retryHeaders.set("Content-Type", "application/json");
+        }
+        retryHeaders.set("Authorization", `Bearer ${newAccessToken}`);
+
+        return apiFetch<T>(endpoint, {
+          ...options,
+          headers: retryHeaders,
+          _isRetry: true,
+        });
       } else {
         // No refresh token available -> clear stored access token and notify
         clearStoredTokens();

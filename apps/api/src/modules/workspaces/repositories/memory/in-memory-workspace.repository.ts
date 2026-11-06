@@ -1,13 +1,29 @@
 import { randomUUID } from "node:crypto";
 
+import type { WorkItemRepository } from "../../../work-management/repositories/work-item.repository.js";
+import { WorkspaceOwnerRequiredError } from "../../workspace.errors.js";
 import type {
   AddWorkspaceMemberInput,
   CreateWorkspaceInput,
   Workspace,
   WorkspaceMember,
+  WorkspaceMemberUser,
+  WorkspaceMemberWithUser,
+  WorkspaceRole,
   WorkspaceWithMembership,
 } from "../../workspace.types.js";
 import type { WorkspaceRepository } from "../../workspace.repository.js";
+import type { TeamRepository } from "../team.repository.js";
+
+/**
+ * Removing a workspace member also touches teams and work items, which live
+ * in their own in-memory repositories. The Prisma implementation does that
+ * in one transaction; here the collaborators are updated back to back.
+ */
+export interface InMemoryWorkspaceRepositoryCollaborators {
+  teamRepository?: TeamRepository | undefined;
+  workItemRepository?: WorkItemRepository | undefined;
+}
 
 export class InMemoryWorkspaceRepository
   implements WorkspaceRepository
@@ -17,6 +33,12 @@ export class InMemoryWorkspaceRepository
 
   private readonly memberships =
     new Map<string, WorkspaceMember>();
+
+  private readonly userMap = new Map<string, WorkspaceMemberUser>();
+
+  constructor(
+    private readonly collaborators: InMemoryWorkspaceRepositoryCollaborators = {},
+  ) {}
 
   async create(
     input: CreateWorkspaceInput,
@@ -127,16 +149,14 @@ export class InMemoryWorkspaceRepository
     );
   }
 
-  private readonly userMap = new Map<string, import("../../workspace.types.js").WorkspaceMemberUser>();
-
-  setUser(user: import("../../workspace.types.js").WorkspaceMemberUser): void {
+  setUser(user: WorkspaceMemberUser): void {
     this.userMap.set(user.id, user);
   }
 
   async listMemberships(
     workspaceId: string,
-  ): Promise<import("../../workspace.types.js").WorkspaceMemberWithUser[]> {
-    const results: import("../../workspace.types.js").WorkspaceMemberWithUser[] = [];
+  ): Promise<WorkspaceMemberWithUser[]> {
+    const results: WorkspaceMemberWithUser[] = [];
 
     for (const membership of this.memberships.values()) {
       if (
@@ -160,10 +180,28 @@ export class InMemoryWorkspaceRepository
     return results;
   }
 
+  async countMembersWithRole(
+    workspaceId: string,
+    role: WorkspaceRole,
+  ): Promise<number> {
+    let count = 0;
+
+    for (const membership of this.memberships.values()) {
+      if (
+        membership.workspaceId === workspaceId &&
+        membership.role === role
+      ) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
   async updateMemberRole(
     workspaceId: string,
     userId: string,
-    role: WorkspaceMember["role"],
+    role: WorkspaceRole,
   ): Promise<WorkspaceMember | null> {
     const key = this.membershipKey(
       workspaceId,
@@ -175,6 +213,10 @@ export class InMemoryWorkspaceRepository
 
     if (!membership) {
       return null;
+    }
+
+    if (membership.role === "OWNER" && role !== "OWNER") {
+      this.assertAnotherOwner(workspaceId, userId);
     }
 
     const updatedMembership: WorkspaceMember =
@@ -195,12 +237,57 @@ export class InMemoryWorkspaceRepository
     workspaceId: string,
     userId: string,
   ): Promise<boolean> {
-    return this.memberships.delete(
-      this.membershipKey(
-        workspaceId,
-        userId,
-      ),
-    );
+    const key = this.membershipKey(workspaceId, userId);
+    const membership = this.memberships.get(key);
+
+    if (!membership) {
+      return false;
+    }
+
+    if (membership.role === "OWNER") {
+      this.assertAnotherOwner(workspaceId, userId);
+    }
+
+    this.memberships.delete(key);
+
+    const { teamRepository, workItemRepository } = this.collaborators;
+
+    if (teamRepository) {
+      const teams = await teamRepository.findTeamsForUser(workspaceId, userId);
+      for (const team of teams) {
+        await teamRepository.removeMember(team.id, userId);
+      }
+    }
+
+    if (workItemRepository) {
+      const workItems = await workItemRepository.findByWorkspace(workspaceId);
+      for (const workItem of workItems) {
+        if (workItem.assigneeUserId === userId) {
+          await workItemRepository.update(workspaceId, workItem.id, {
+            assigneeUserId: null,
+          });
+        }
+      }
+    }
+
+    return true;
+  }
+
+  private assertAnotherOwner(
+    workspaceId: string,
+    excludingUserId: string,
+  ): void {
+    for (const membership of this.memberships.values()) {
+      if (
+        membership.workspaceId === workspaceId &&
+        membership.role === "OWNER" &&
+        membership.userId !== excludingUserId
+      ) {
+        return;
+      }
+    }
+
+    throw new WorkspaceOwnerRequiredError();
   }
 
   private membershipKey(

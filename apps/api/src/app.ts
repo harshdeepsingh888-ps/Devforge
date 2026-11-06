@@ -35,6 +35,7 @@ import {
   invitationRoutes,
   workspaceInvitationRoutes,
 } from "./modules/workspaces/routes/invitation.routes.js";
+import { workspaceMemberRoutes } from "./modules/workspaces/routes/member.routes.js";
 import { InMemoryUserRepository } from "./modules/auth/repositories/memory/in-memory-user.repository.js";
 import type { UserRepository } from "./modules/auth/repositories/user.repository.js";
 import { InMemoryWorkflowRepository } from "./modules/work-management/repositories/memory/in-memory-workflow.repository.js";
@@ -172,16 +173,21 @@ export function buildApp(
     options.projectRepository ??
     new InMemoryProjectRepository();
 
+  const teamRepository =
+    options.teamRepository ?? new InMemoryTeamRepository();
+
+  const workItemRepository =
+    options.workItemRepository ?? new InMemoryWorkItemRepository();
+
+  // Removing a member also clears their team memberships and assignments,
+  // so the in-memory default needs the repositories that hold those.
   const workspaceRepository =
     options.workspaceRepository ??
-    new InMemoryWorkspaceRepository();
+    new InMemoryWorkspaceRepository({ teamRepository, workItemRepository });
 
   const workspaceService =
     options.workspaceService ??
     new WorkspaceService(workspaceRepository);
-
-  const teamRepository =
-    options.teamRepository ?? new InMemoryTeamRepository();
 
   const teamService =
     options.teamService ??
@@ -204,9 +210,6 @@ export function buildApp(
 
   const workflowRepository =
     options.workflowRepository ?? new InMemoryWorkflowRepository();
-
-  const workItemRepository =
-    options.workItemRepository ?? new InMemoryWorkItemRepository();
 
   const commentRepository =
     options.commentRepository ?? new InMemoryCommentRepository();
@@ -484,6 +487,14 @@ export function buildApp(
           prefix: "/api/workspaces",
           service: workspaceService,
           teamService,
+        },
+      );
+
+      await application.register(
+        workspaceMemberRoutes,
+        {
+          prefix: "/api/workspaces/:workspaceId/members",
+          workspaceService,
         },
       );
 

@@ -1,6 +1,10 @@
-import type { PrismaClient } from "../../../../generated/prisma/client.js";
+import type {
+  Prisma,
+  PrismaClient,
+} from "../../../../generated/prisma/client.js";
 import { prisma } from "../../../../infrastructure/database/prisma.js";
 
+import { WorkspaceOwnerRequiredError } from "../../workspace.errors.js";
 import type { WorkspaceRepository } from "../../workspace.repository.js";
 
 import type {
@@ -8,13 +12,14 @@ import type {
   CreateWorkspaceInput,
   Workspace,
   WorkspaceMember,
+  WorkspaceMemberWithUser,
   WorkspaceRole,
   WorkspaceWithMembership,
 } from "../../workspace.types.js";
 
 type WorkspaceDatabaseClient = Pick<
   PrismaClient,
-  "workspace" | "workspaceMember"
+  "workspace" | "workspaceMember" | "teamMember" | "workItem" | "$transaction"
 >;
 
 function toWorkspaceDomain(raw: any): Workspace {
@@ -48,6 +53,37 @@ function toWorkspaceMemberDomain(
         ? raw.joinedAt.toISOString()
         : raw.joinedAt,
   };
+}
+
+/**
+ * Serialises membership changes per workspace for the rest of the
+ * transaction. Two concurrent "last owner" checks would otherwise each see
+ * the other owner still present and both succeed; with the workspace row
+ * locked, the second one waits and then sees the first one's result.
+ */
+async function lockWorkspace(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+): Promise<void> {
+  await tx.$queryRaw`SELECT "id" FROM "Workspace" WHERE "id" = ${workspaceId} FOR UPDATE`;
+}
+
+async function assertAnotherOwner(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  excludingUserId: string,
+): Promise<void> {
+  const otherOwners = await tx.workspaceMember.count({
+    where: {
+      workspaceId,
+      role: "OWNER",
+      userId: { not: excludingUserId },
+    },
+  });
+
+  if (otherOwners === 0) {
+    throw new WorkspaceOwnerRequiredError();
+  }
 }
 
 export class PrismaWorkspaceRepository
@@ -175,26 +211,52 @@ export class PrismaWorkspaceRepository
     workspaceId: string,
     userId: string,
   ): Promise<boolean> {
-    const existing =
-      await this.findMembership(
-        workspaceId,
-        userId,
-      );
+    return this.database.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await lockWorkspace(tx, workspaceId);
 
-    if (!existing) {
-      return false;
-    }
+        const existing = await tx.workspaceMember.findUnique({
+          where: {
+            workspaceId_userId: { workspaceId, userId },
+          },
+        });
 
-    await this.database.workspaceMember.delete({
-      where: {
-        workspaceId_userId: {
-          workspaceId,
-          userId,
-        },
+        if (!existing) {
+          return false;
+        }
+
+        if (existing.role === "OWNER") {
+          await assertAnotherOwner(tx, workspaceId, userId);
+        }
+
+        await tx.workspaceMember.delete({
+          where: {
+            workspaceId_userId: { workspaceId, userId },
+          },
+        });
+
+        // TeamMember carries no workspaceId: scope the delete through the
+        // team's workspace so memberships elsewhere are untouched.
+        await tx.teamMember.deleteMany({
+          where: {
+            userId,
+            team: { workspaceId },
+          },
+        });
+
+        await tx.workItem.updateMany({
+          where: {
+            workspaceId,
+            assigneeUserId: userId,
+          },
+          data: {
+            assigneeUserId: null,
+          },
+        });
+
+        return true;
       },
-    });
-
-    return true;
+    );
   }
 
   async updateMemberRole(
@@ -202,38 +264,48 @@ export class PrismaWorkspaceRepository
     userId: string,
     role: WorkspaceRole,
   ): Promise<WorkspaceMember | null> {
-    const existing =
-      await this.findMembership(
-        workspaceId,
-        userId,
-      );
+    return this.database.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await lockWorkspace(tx, workspaceId);
 
-    if (!existing) {
-      return null;
-    }
-
-    const updated =
-      await this.database.workspaceMember.update({
-        where: {
-          workspaceId_userId: {
-            workspaceId,
-            userId,
+        const existing = await tx.workspaceMember.findUnique({
+          where: {
+            workspaceId_userId: { workspaceId, userId },
           },
-        },
+        });
 
-        data: {
-          role,
-        },
-      });
+        if (!existing) {
+          return null;
+        }
 
-    return toWorkspaceMemberDomain(
-      updated,
+        if (existing.role === "OWNER" && role !== "OWNER") {
+          await assertAnotherOwner(tx, workspaceId, userId);
+        }
+
+        const updated = await tx.workspaceMember.update({
+          where: {
+            workspaceId_userId: { workspaceId, userId },
+          },
+          data: { role },
+        });
+
+        return toWorkspaceMemberDomain(updated);
+      },
     );
+  }
+
+  async countMembersWithRole(
+    workspaceId: string,
+    role: WorkspaceRole,
+  ): Promise<number> {
+    return this.database.workspaceMember.count({
+      where: { workspaceId, role },
+    });
   }
 
   async listMemberships(
     workspaceId: string,
-  ): Promise<import("../../workspace.types.js").WorkspaceMemberWithUser[]> {
+  ): Promise<WorkspaceMemberWithUser[]> {
     const memberships = await (this.database as any).workspaceMember.findMany({
       where: {
         workspaceId,

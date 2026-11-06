@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Project, Workspace } from "../types/api.types";
+import type { Project, Workspace, WorkspaceRole } from "../types/api.types";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { MembersPanel } from "../components/workspace/MembersPanel";
@@ -13,6 +13,8 @@ interface AppShellProps {
   onProjectUpdated: (project: Project) => void;
   onProjectDeleted: (projectId: string) => void;
   onSwitchWorkspace: () => void;
+  onLeaveWorkspace: () => void;
+  onOwnRoleChanged: (role: WorkspaceRole) => void;
   onLogout: () => void | Promise<void>;
   children: React.ReactNode;
 }
@@ -26,6 +28,8 @@ export const AppShell: React.FC<AppShellProps> = ({
   onProjectUpdated,
   onProjectDeleted,
   onSwitchWorkspace,
+  onLeaveWorkspace,
+  onOwnRoleChanged,
   onLogout,
   children,
 }) => {
@@ -64,6 +68,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             <MembersPanel
               workspace={workspace}
               onClose={() => setIsMembersOpen(false)}
+              onLeave={onLeaveWorkspace}
+              onOwnRoleChanged={onOwnRoleChanged}
             />
           </div>
         </div>

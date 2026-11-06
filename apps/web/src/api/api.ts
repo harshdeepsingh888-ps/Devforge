@@ -24,6 +24,7 @@ import type {
   Workspace,
   WorkspaceInvitation,
   WorkspaceMember,
+  WorkspaceMembership,
   WorkspaceRole,
 } from "../types/api.types";
 
@@ -332,6 +333,27 @@ export const api = {
 
   async getWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
     return apiFetch<WorkspaceMember[]>(`/api/workspaces/${workspaceId}/members`);
+  },
+
+  async updateMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: WorkspaceRole,
+  ): Promise<WorkspaceMembership> {
+    return apiFetch<WorkspaceMembership>(
+      `/api/workspaces/${workspaceId}/members/${userId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ role }),
+      },
+    );
+  },
+
+  /** Removes a member, or leaves the workspace when userId is the caller's own id. */
+  async removeMember(workspaceId: string, userId: string): Promise<void> {
+    return apiFetch<void>(`/api/workspaces/${workspaceId}/members/${userId}`, {
+      method: "DELETE",
+    });
   },
 
   async getTeams(workspaceId: string): Promise<Team[]> {

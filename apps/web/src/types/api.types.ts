@@ -23,11 +23,15 @@ export interface WorkspaceMemberUser {
   avatarUrl?: string | null;
 }
 
-export interface WorkspaceMember {
+/** A membership row as the API returns it after a role change. */
+export interface WorkspaceMembership {
   workspaceId: string;
   userId: string;
   role: "OWNER" | "ADMIN" | "DEVELOPER" | "VIEWER";
   joinedAt: string;
+}
+
+export interface WorkspaceMember extends WorkspaceMembership {
   user: WorkspaceMemberUser;
 }
 

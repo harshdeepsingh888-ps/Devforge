@@ -277,20 +277,27 @@ export const App: React.FC = () => {
 
   /*
    * LOAD PROJECTS AFTER WORKSPACE SELECTION
+   *
+   * Keyed on the workspace id, not the object: the object is also replaced
+   * when only a cached field changes (for example the user's own role after
+   * stepping down), and reloading projects then would swap the whole shell
+   * for the loading screen and close whatever panel the user has open.
    */
+  const activeWorkspaceId = activeWorkspace?.id ?? null;
+
   useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
 
-    if (!activeWorkspace) {
+    if (!activeWorkspaceId) {
       return;
     }
 
-    void loadProjects(activeWorkspace.id);
+    void loadProjects(activeWorkspaceId);
   }, [
     isAuthenticated,
-    activeWorkspace,
+    activeWorkspaceId,
     loadProjects,
   ]);
 

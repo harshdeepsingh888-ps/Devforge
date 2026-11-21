@@ -169,8 +169,11 @@ export class WorkspaceService {
 
   /**
    * OWNER may set any role. ADMIN may set ADMIN, DEVELOPER or VIEWER, but
-   * may neither grant OWNER nor touch an existing OWNER. Nobody may demote
-   * the workspace's last OWNER.
+   * may neither grant OWNER nor touch an existing OWNER, and may change an
+   * ADMIN's role only their own. That last rule mirrors removal: otherwise an
+   * ADMIN could demote a peer to VIEWER and then remove them, getting around
+   * the rule that ADMINs cannot remove ADMINs. Nobody may demote the
+   * workspace's last OWNER.
    */
   async changeMemberRole(
     params: ChangeMemberRoleParams,
@@ -202,6 +205,12 @@ export class WorkspaceService {
       if (target.role === "OWNER") {
         throw new WorkspacePermissionDeniedError(
           "Only workspace OWNERs can change an OWNER's role.",
+        );
+      }
+
+      if (target.role === "ADMIN" && target.userId !== actor.userId) {
+        throw new WorkspacePermissionDeniedError(
+          "Only workspace OWNERs can change another ADMIN's role.",
         );
       }
     }

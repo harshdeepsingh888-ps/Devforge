@@ -272,7 +272,7 @@ export const MembersPanel: React.FC<MembersPanelProps> = ({
             <ul className="mt-2 divide-y divide-[#f2ede5] dark:divide-white/[0.06]">
               {members.map((member) => {
                 const isSelf = member.userId === selfUserId;
-                const options = canManage ? roleOptionsFor(role, member, members) : [];
+                const options = canManage ? roleOptionsFor(role, member, members, selfUserId) : [];
                 const removable = canManage && canRemoveMember(role, selfUserId, member, members);
                 const isBusy = busyUserId === member.userId;
                 const isConfirmingRemove = confirmRemoveUserId === member.userId;

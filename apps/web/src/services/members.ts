@@ -28,12 +28,15 @@ export function isLastOwner(member: MemberLike, members: readonly MemberLike[]):
  * Roles the actor may assign to the target, including the target's current
  * role so a select can show it. Empty when the actor may not change this
  * member at all: DEVELOPER and VIEWER never may, an ADMIN may not touch an
- * OWNER, and nobody may demote the last OWNER.
+ * OWNER or another ADMIN (only their own row), and nobody may demote the
+ * last OWNER. Without actorUserId an ADMIN is never offered an ADMIN row,
+ * which is the safe direction to fail in.
  */
 export function roleOptionsFor(
   actorRole: WorkspaceRole | undefined,
   target: MemberLike,
   members: readonly MemberLike[],
+  actorUserId?: string,
 ): WorkspaceRole[] {
   if (isLastOwner(target, members)) {
     return [];
@@ -44,6 +47,10 @@ export function roleOptionsFor(
   }
 
   if (actorRole === "ADMIN" && target.role !== "OWNER") {
+    if (target.role === "ADMIN" && target.userId !== actorUserId) {
+      return [];
+    }
+
     return ["ADMIN", "DEVELOPER", "VIEWER"];
   }
 

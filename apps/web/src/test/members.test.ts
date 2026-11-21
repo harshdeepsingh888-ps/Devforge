@@ -104,3 +104,32 @@ test("@devforge/web: Members — anyone may leave except the last OWNER", () => 
   assert.equal(canLeaveWorkspace("stranger", singleOwnerTeam), false);
   assert.equal(canLeaveWorkspace(undefined, singleOwnerTeam), false);
 });
+
+test("@devforge/web: Members — an ADMIN may change only their own role among ADMINs", () => {
+  const peerAdmin = { userId: "admin-2", role: "ADMIN" as const };
+  const team = [...singleOwnerTeam, peerAdmin];
+  const everyRole = ["OWNER", "ADMIN", "DEVELOPER", "VIEWER"];
+
+  // Another ADMIN's row is read-only for an ADMIN, which mirrors removal
+  assert.deepEqual(roleOptionsFor("ADMIN", peerAdmin, team, "admin"), []);
+
+  // Their own row stays editable, so an ADMIN can step down
+  assert.deepEqual(roleOptionsFor("ADMIN", admin, team, "admin"), [
+    "ADMIN",
+    "DEVELOPER",
+    "VIEWER",
+  ]);
+
+  // Not knowing who is acting fails closed for ADMIN rows
+  assert.deepEqual(roleOptionsFor("ADMIN", admin, team), []);
+
+  // DEVELOPER and VIEWER rows are unaffected
+  assert.deepEqual(roleOptionsFor("ADMIN", developer, team, "admin"), [
+    "ADMIN",
+    "DEVELOPER",
+    "VIEWER",
+  ]);
+
+  // An OWNER may still change any ADMIN
+  assert.deepEqual(roleOptionsFor("OWNER", peerAdmin, team, "owner"), everyRole);
+});

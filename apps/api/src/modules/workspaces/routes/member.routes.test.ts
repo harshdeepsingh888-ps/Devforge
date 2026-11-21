@@ -564,3 +564,67 @@ test("DELETE member clears the member's team memberships and work item assignmen
   );
   assert.equal(otherMembership?.role, "DEVELOPER");
 });
+
+test("PATCH member role: an ADMIN cannot change a peer ADMIN's role, but can change their own; an OWNER can change either", async (t) => {
+  const { app, users, headers, memberUrl } = await createTestSetup();
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  // The OWNER promotes the developer, so there are now two ADMINs
+  const promoteRes = await app.inject({
+    method: "PATCH",
+    url: memberUrl(users.developer.id),
+    headers: headers.owner,
+    payload: { role: "ADMIN" },
+  });
+  assert.equal(promoteRes.statusCode, 200);
+
+  // Without this rule an ADMIN could demote a peer to VIEWER and then remove them,
+  // sidestepping the rule that ADMINs cannot remove ADMINs.
+  const demotePeerRes = await app.inject({
+    method: "PATCH",
+    url: memberUrl(users.developer.id),
+    headers: headers.admin,
+    payload: { role: "VIEWER" },
+  });
+  assert.equal(demotePeerRes.statusCode, 403);
+  assert.equal(demotePeerRes.json().error, "FORBIDDEN");
+
+  const reaffirmPeerRes = await app.inject({
+    method: "PATCH",
+    url: memberUrl(users.developer.id),
+    headers: headers.admin,
+    payload: { role: "ADMIN" },
+  });
+  assert.equal(reaffirmPeerRes.statusCode, 403);
+
+  // The peer is untouched and still cannot be removed by the other ADMIN
+  const removePeerRes = await app.inject({
+    method: "DELETE",
+    url: memberUrl(users.developer.id),
+    headers: headers.admin,
+  });
+  assert.equal(removePeerRes.statusCode, 403);
+
+  // An ADMIN may still step down from their own role
+  const selfDemoteRes = await app.inject({
+    method: "PATCH",
+    url: memberUrl(users.admin.id),
+    headers: headers.admin,
+    payload: { role: "DEVELOPER" },
+  });
+  assert.equal(selfDemoteRes.statusCode, 200);
+  assert.equal(selfDemoteRes.json().data.role, "DEVELOPER");
+
+  // An OWNER may change an ADMIN
+  const ownerDemotesRes = await app.inject({
+    method: "PATCH",
+    url: memberUrl(users.developer.id),
+    headers: headers.owner,
+    payload: { role: "VIEWER" },
+  });
+  assert.equal(ownerDemotesRes.statusCode, 200);
+  assert.equal(ownerDemotesRes.json().data.role, "VIEWER");
+});

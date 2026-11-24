@@ -1,13 +1,18 @@
 // Smoke test for a running DevForge API: the built server, the container image,
 // and later a freshly deployed release.
 //
-//   node scripts/smoke.mjs [baseUrl] [--write] [--wait=<seconds>]
+//   node scripts/smoke.mjs [baseUrl] [--write] [--web] [--wait=<seconds>]
 //
 // By default it only reads: /health and /ready. Pass --write to also register a
 // throwaway user and walk the real auth path (register, login, an authenticated
 // request, logout). That exercises password hashing, token signing and the
 // database, which is where a broken build artifact usually fails. --write
 // creates a user, so never point it at a database you care about.
+//
+// --web additionally checks that the API is serving the built web app: the page,
+// a fingerprinted asset with its long cache lifetime, a client-side route, and
+// that unknown API paths and missing files are still 404s rather than HTML. It
+// only reads, so it is safe against a live deployment.
 //
 // --expect-database-down checks the opposite case against a server started with
 // an unreachable database: the process must stay alive (/health 200) while
@@ -23,6 +28,7 @@ const waitSeconds = Number(
 );
 const write = flags.has("--write");
 const expectDatabaseDown = flags.has("--expect-database-down");
+const checkWeb = flags.has("--web");
 
 function fail(message) {
   console.error(`FAIL  ${message}`);
@@ -66,6 +72,59 @@ function expectStatus(label, result, expected) {
   pass(`${label} -> ${expected}`);
 }
 
+async function rawGet(path) {
+  try {
+    const response = await fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(10_000) });
+    return { status: response.status, headers: response.headers, text: await response.text() };
+  } catch (error) {
+    return fail(`GET ${path} did not answer: ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+function expectThat(condition, message) {
+  if (!condition) {
+    fail(message);
+  }
+  pass(message);
+}
+
+async function checkWebApp() {
+  const page = await rawGet("/");
+  expectThat(page.status === 200, "GET / -> 200");
+  expectThat(/text\/html/.test(page.headers.get("content-type") ?? ""), "GET / is HTML");
+  expectThat(page.text.includes('id="root"'), "GET / is the app (has the root element)");
+  expectThat(page.headers.get("cache-control") === "no-cache", "the page is not cached");
+  expectThat(
+    /script-src 'self'/.test(page.headers.get("content-security-policy") ?? ""),
+    "the page carries a Content-Security-Policy",
+  );
+  expectThat(!/<script(?![^>]*\bsrc=)[^>]*>/i.test(page.text), "the page has no inline script");
+
+  const assetPath = /<script[^>]*\ssrc="(\/assets\/[^"]+\.js)"/.exec(page.text)?.[1];
+  if (!assetPath) {
+    fail("the page does not reference a script under /assets/");
+  }
+  const asset = await rawGet(assetPath);
+  expectThat(asset.status === 200, `GET ${assetPath} -> 200`);
+  expectThat(/javascript/.test(asset.headers.get("content-type") ?? ""), "the script is served as JavaScript");
+  expectThat(/immutable/.test(asset.headers.get("cache-control") ?? ""), "the script is cached as immutable");
+
+  const theme = await rawGet("/theme-init.js");
+  expectThat(theme.status === 200 && /javascript/.test(theme.headers.get("content-type") ?? ""), "GET /theme-init.js is JavaScript");
+
+  const route = await rawGet("/projects/does-not-exist");
+  expectThat(route.status === 200 && route.text.includes('id="root"'), "a client-side route gets the app");
+
+  const unknownApi = await rawGet("/api/this-route-does-not-exist");
+  expectThat(
+    unknownApi.status === 404 && /application\/json/.test(unknownApi.headers.get("content-type") ?? ""),
+    "an unknown /api path is a JSON 404, not the app",
+  );
+
+  const missing = await rawGet("/assets/missing-file.js");
+  expectThat(missing.status === 404 && !missing.text.includes('id="root"'), "a missing asset is a 404, not the app");
+}
+
 // Wait for the process to start listening. A crash on boot shows up here.
 async function waitForHealth() {
   const deadline = Date.now() + waitSeconds * 1000;
@@ -105,6 +164,10 @@ if (expectDatabaseDown) {
 
 const ready = await request("GET", "/ready");
 expectStatus("GET /ready", ready, 200);
+
+if (checkWeb) {
+  await checkWebApp();
+}
 
 if (!write) {
   console.log("Read-only smoke test passed. Add --write to exercise registration and login.");

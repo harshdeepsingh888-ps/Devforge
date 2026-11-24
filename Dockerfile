@@ -20,6 +20,23 @@ RUN npm run db:generate --workspace @devforge/api
 RUN npm run build --workspace @devforge/api
 
 
+FROM node:24-alpine AS web-builder
+
+WORKDIR /app
+
+# The web app is built here and only its static output reaches the runner, so
+# none of its dependencies (React, Vite, Tailwind) are in the final image. This
+# stage does not depend on the API stages, so the two build in parallel.
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/package.json
+
+RUN npm ci --workspace @devforge/web
+
+COPY apps/web ./apps/web
+
+RUN npm run build --workspace @devforge/web
+
+
 FROM node:24-alpine AS runner
 
 WORKDIR /app
@@ -27,6 +44,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=5000
+ENV WEB_DIST_DIR=/app/apps/web/dist
 
 # A fresh production-only install, not a copy of the builder's node_modules.
 # npm decides whether each package lives in the root node_modules or in
@@ -49,6 +67,10 @@ RUN apk add --no-cache openssl \
   && npm exec --workspace @devforge/api -- prisma --version
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+# The built web app. The API serves it when WEB_DIST_DIR is set, so the browser
+# sees one origin: no CORS, and the app's relative /api calls just work.
+COPY --from=web-builder /app/apps/web/dist ./apps/web/dist
 
 # Migration inputs and the entrypoint. start.mjs applies the migrations first
 # when RUN_MIGRATIONS_ON_START=true, then starts the server.

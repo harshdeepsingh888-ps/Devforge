@@ -14,9 +14,8 @@ coverage
 .idea
 README-assets
 
-# Not needed to build the API image. src/generated is also excluded so a local
-# build regenerates the Prisma client exactly as a clean CI checkout does.
+# src/generated is excluded so a local build regenerates the Prisma client
+# exactly as a clean CI checkout does.
 .github
 infra
-apps/web
 apps/api/src/generated

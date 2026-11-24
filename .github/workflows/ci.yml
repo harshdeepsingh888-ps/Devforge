@@ -128,7 +128,7 @@ jobs:
             --env "DATABASE_URL=postgresql://devforge_ci:devforge_ci_password@127.0.0.1:5432/devforge_ci_fresh?schema=public" \
             devforge-api:ci
           trap 'status=$?; if [ "$status" -ne 0 ]; then echo "--- container log ---"; docker logs devforge-api || true; fi; docker rm --force devforge-api > /dev/null 2>&1 || true' EXIT
-          node apps/api/scripts/smoke.mjs http://127.0.0.1:5001 --write --wait=90
+          node apps/api/scripts/smoke.mjs http://127.0.0.1:5001 --write --web --wait=90
 
       - name: Container refuses to start when migrations fail
         run: |

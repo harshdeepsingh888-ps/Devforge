@@ -76,6 +76,10 @@ export const env = {
   // Number of reverse proxies in front of this process; false when none.
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 
+  // Directory of the built web app. Set in the container image so one process
+  // serves both the API and the app; unset in development.
+  webDistDir: process.env.WEB_DIST_DIR?.trim() || undefined,
+
   host:
     process.env.HOST?.trim() ||
     DEFAULT_HOST,

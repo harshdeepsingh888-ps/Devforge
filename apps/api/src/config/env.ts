@@ -1,4 +1,5 @@
 import type { AuthModuleConfiguration } from "../modules/auth/auth.module.js";
+import { parseTrustProxy } from "./trust-proxy.js";
 
 const DEFAULT_PORT = 5000;
 const DEFAULT_HOST = "0.0.0.0";
@@ -71,6 +72,9 @@ function requireEnvironmentVariable(
 
 export const env = {
   port: parsePort(process.env.PORT),
+
+  // Number of reverse proxies in front of this process; false when none.
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
 
   host:
     process.env.HOST?.trim() ||

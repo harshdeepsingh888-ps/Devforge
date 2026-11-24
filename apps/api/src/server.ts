@@ -46,6 +46,14 @@ const buildLogRepository = new PrismaBuildLogRepository(prisma);
 const deploymentRepository = new PrismaDeploymentRepository(prisma);
 
 const app = buildApp({
+  // Without this every client behind a host's proxy shares the proxy's address,
+  // and so one rate-limit bucket. See config/trust-proxy.ts before changing it.
+  serverOptions: { trustProxy: env.trustProxy },
+  // Makes GET /ready answer 503 when the database stops answering. Do not drop
+  // this: without it /ready would report ready regardless of the database.
+  readinessCheck: async () => {
+    await prisma.$queryRaw`SELECT 1`;
+  },
   authenticationService: authenticationModule.authenticationService,
   accessTokenService: authenticationModule.accessTokenService,
   workspaceRepository,

@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     services:
       postgres:
@@ -81,3 +81,66 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Tests and the dev server run from source, so they cannot notice a build
+      # artifact that fails to start. This starts the compiled server for real
+      # and walks the auth path against the migrated database.
+      - name: Smoke test the built API
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          node --env-file=.env dist/server.js > "$RUNNER_TEMP/api.log" 2>&1 &
+          server_pid=$!
+          trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api.log"; fi' EXIT
+          node scripts/smoke.mjs http://127.0.0.1:5000 --write
+
+      # When the database is unreachable the process must stay up (/health 200)
+      # while /ready answers 503. This also proves server.ts really wires the
+      # readiness check in: a build that forgot it would answer 200 here.
+      - name: Smoke test readiness with the database unreachable
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          DATABASE_URL="postgresql://nobody:nothing@127.0.0.1:1/none" PORT=5002 node --env-file=.env dist/server.js > "$RUNNER_TEMP/api-down.log" 2>&1 &
+          server_pid=$!
+          trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api-down.log"; fi' EXIT
+          node scripts/smoke.mjs http://127.0.0.1:5002 --expect-database-down
+
+      # Builds the image from a clean checkout, the way a host will, then runs it
+      # against the migrated service database. Register and login exercise the
+      # native password hashing module, whose Alpine (musl) build is the likeliest
+      # thing to break in this image.
+      - name: Build the container image
+        run: docker build --tag devforge-api:ci .
+
+      - name: Smoke test the container image
+        run: |
+          set -euo pipefail
+          # A second, EMPTY database, so the container has to create the schema
+          # itself the way a first deploy does. The one the earlier steps
+          # migrated is not used here.
+          docker run --rm --network host --env PGPASSWORD=devforge_ci_password postgres:16-alpine \
+            psql --host 127.0.0.1 --username devforge_ci --dbname devforge_ci \
+            --command "CREATE DATABASE devforge_ci_fresh"
+          docker run --detach --name devforge-api --network host \
+            --env-file apps/api/.env --env PORT=5001 \
+            --env RUN_MIGRATIONS_ON_START=true \
+            --env "DATABASE_URL=postgresql://devforge_ci:devforge_ci_password@127.0.0.1:5432/devforge_ci_fresh?schema=public" \
+            devforge-api:ci
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "--- container log ---"; docker logs devforge-api || true; fi; docker rm --force devforge-api > /dev/null 2>&1 || true' EXIT
+          node apps/api/scripts/smoke.mjs http://127.0.0.1:5001 --write --wait=90
+
+      - name: Container refuses to start when migrations fail
+        run: |
+          set -euo pipefail
+          # Nothing listens on port 1, so the migration cannot connect. The
+          # container must exit non-zero and must not start serving.
+          if docker run --rm --network host \
+            --env-file apps/api/.env --env PORT=5003 \
+            --env RUN_MIGRATIONS_ON_START=true \
+            --env "DATABASE_URL=postgresql://nobody:nothing@127.0.0.1:1/none" \
+            devforge-api:ci; then
+            echo "The container exited successfully although migrations failed."
+            exit 1
+          fi
+          echo "Container exited non-zero as required."

@@ -93,3 +93,15 @@ jobs:
           server_pid=$!
           trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api.log"; fi' EXIT
           node scripts/smoke.mjs http://127.0.0.1:5000 --write
+
+      # When the database is unreachable the process must stay up (/health 200)
+      # while /ready answers 503. This also proves server.ts really wires the
+      # readiness check in: a build that forgot it would answer 200 here.
+      - name: Smoke test readiness with the database unreachable
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          DATABASE_URL="postgresql://nobody:nothing@127.0.0.1:1/none" PORT=5002 node --env-file=.env dist/server.js > "$RUNNER_TEMP/api-down.log" 2>&1 &
+          server_pid=$!
+          trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api-down.log"; fi' EXIT
+          node scripts/smoke.mjs http://127.0.0.1:5002 --expect-database-down

@@ -8,6 +8,10 @@
 // request, logout). That exercises password hashing, token signing and the
 // database, which is where a broken build artifact usually fails. --write
 // creates a user, so never point it at a database you care about.
+//
+// --expect-database-down checks the opposite case against a server started with
+// an unreachable database: the process must stay alive (/health 200) while
+// /ready answers 503 and reveals nothing beyond its status.
 
 import { randomBytes } from "node:crypto";
 
@@ -18,6 +22,7 @@ const waitSeconds = Number(
   args.find((arg) => arg.startsWith("--wait="))?.split("=")[1] ?? "30",
 );
 const write = flags.has("--write");
+const expectDatabaseDown = flags.has("--expect-database-down");
 
 function fail(message) {
   console.error(`FAIL  ${message}`);
@@ -84,6 +89,19 @@ async function waitForHealth() {
 }
 
 await waitForHealth();
+
+if (expectDatabaseDown) {
+  const down = await request("GET", "/ready");
+  expectStatus("GET /ready with the database unreachable", down, 503);
+
+  if (JSON.stringify(down.json) !== JSON.stringify({ status: "unavailable" })) {
+    fail(`/ready revealed more than its status: ${JSON.stringify(down.json)}`);
+  }
+  pass("/ready body reveals nothing beyond its status");
+
+  console.log("Failure-path smoke test passed: the process stays up and reports not ready.");
+  process.exit(0);
+}
 
 const ready = await request("GET", "/ready");
 expectStatus("GET /ready", ready, 200);

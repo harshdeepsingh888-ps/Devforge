@@ -136,6 +136,12 @@ export interface BuildAppOptions {
   buildLogRepository?: BuildLogRepository;
   deploymentRepository?: DeploymentRepository;
   cicdService?: CicdService;
+  /**
+   * Used by GET /ready to confirm the database answers. Pass it in production
+   * (see server.ts); without it /ready only reports that the process is up.
+   */
+  readinessCheck?: (() => Promise<void>) | undefined;
+  readinessTimeoutMs?: number | undefined;
 }
 
 export function buildApp(
@@ -465,6 +471,10 @@ export function buildApp(
 
       await application.register(
         readinessRoutes,
+        {
+          checkDatabase: options.readinessCheck,
+          timeoutMs: options.readinessTimeoutMs,
+        },
       );
 
       if (options.authenticationService) {

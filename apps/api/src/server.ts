@@ -49,6 +49,7 @@ const app = buildApp({
   // Without this every client behind a host's proxy shares the proxy's address,
   // and so one rate-limit bucket. See config/trust-proxy.ts before changing it.
   serverOptions: { trustProxy: env.trustProxy },
+  webAssets: env.webDistDir ? { directory: env.webDistDir } : undefined,
   // Makes GET /ready answer 503 when the database stops answering. Do not drop
   // this: without it /ready would report ready regardless of the database.
   readinessCheck: async () => {

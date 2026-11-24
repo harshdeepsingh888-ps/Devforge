@@ -18,6 +18,7 @@ import {
 } from "./modules/projects/project.repository.js";
 import { projectRoutes } from "./modules/projects/project.routes.js";
 import { readinessRoutes } from "./routes/readiness.routes.js";
+import { webAssetsPlugin, type WebAssetsOptions } from "./routes/web-assets.js";
 import type { AccessTokenService } from "./modules/auth/security/jwt.service.js";
 import { JwtAccessTokenService } from "./modules/auth/security/jwt.service.js";
 import { authenticationPlugin } from "./modules/auth/plugins/authentication.plugin.js";
@@ -143,6 +144,11 @@ export interface BuildAppOptions {
    */
   readinessCheck?: (() => Promise<void>) | undefined;
   readinessTimeoutMs?: number | undefined;
+  /**
+   * Serve the built web app from this API (one origin, no CORS). Unset in
+   * development, where Vite serves the app, and in tests.
+   */
+  webAssets?: WebAssetsOptions | undefined;
 }
 
 export function buildApp(
@@ -368,6 +374,12 @@ export function buildApp(
   });
 
   void app.register(helmet);
+
+  // Registered after helmet so the app's files get the same security headers
+  // (including the Content-Security-Policy) as the API's responses.
+  if (options.webAssets) {
+    void app.register(webAssetsPlugin, options.webAssets);
+  }
 
   app.addHook(
     "onResponse",

@@ -18,7 +18,6 @@ COPY apps/api ./apps/api
 # and copies it into dist. Generating needs no database connection.
 RUN npm run db:generate --workspace @devforge/api
 RUN npm run build --workspace @devforge/api
-RUN npm prune --omit=dev
 
 
 FROM node:24-alpine AS runner
@@ -29,14 +28,24 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=5000
 
+# A fresh production-only install, not a copy of the builder's node_modules.
+# npm decides whether each package lives in the root node_modules or in
+# apps/api/node_modules, and here it put the whole Prisma tree under the
+# latter, so copying only the root left the image without @prisma/adapter-pg.
+# Installing again with the same lockfile reproduces that layout whatever it is.
+# Lifecycle scripts are skipped: nothing in the production tree needs one, and a
+# production install should not run arbitrary install scripts.
+COPY package.json package-lock.json ./
+COPY apps/api/package.json ./apps/api/package.json
+RUN npm ci --omit=dev --ignore-scripts --workspace @devforge/api \
+  && npm cache clean --force
+
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+# The app only reads its own files, so they stay owned by root and the process
+# runs as a user that cannot modify them.
 RUN addgroup --system --gid 1001 devforge \
   && adduser --system --uid 1001 --ingroup devforge devforge
-
-COPY --from=builder --chown=devforge:devforge /app/package.json ./package.json
-COPY --from=builder --chown=devforge:devforge /app/package-lock.json ./package-lock.json
-COPY --from=builder --chown=devforge:devforge /app/node_modules ./node_modules
-COPY --from=builder --chown=devforge:devforge /app/apps/api/package.json ./apps/api/package.json
-COPY --from=builder --chown=devforge:devforge /app/apps/api/dist ./apps/api/dist
 
 USER devforge
 

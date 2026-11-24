@@ -1,0 +1,83 @@
+name: CI
+
+# One job that proves the repository is in a releasable state: dependencies
+# install from the lockfile, the database migrations apply to an empty
+# PostgreSQL, everything typechecks, every test passes (including the ones
+# that talk to a real database), and both apps build.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: devforge_ci
+          POSTGRES_PASSWORD: devforge_ci_password
+          POSTGRES_DB: devforge_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devforge_ci -d devforge_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://devforge_ci:devforge_ci_password@localhost:5432/devforge_ci?schema=public
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The API test script loads apps/api/.env. Nothing here is a real
+      # credential: the database is the throwaway service container above and
+      # the signing secret is generated fresh for every run.
+      - name: Write the API environment file
+        run: |
+          {
+            echo "DATABASE_URL=${DATABASE_URL}"
+            echo "JWT_ACCESS_TOKEN_SECRET=$(openssl rand -base64 48)"
+            echo "JWT_ISSUER=devforge-ci"
+            echo "JWT_AUDIENCE=devforge-ci"
+            echo "JWT_ACCESS_TOKEN_EXPIRES_IN_SECONDS=900"
+            echo "REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000"
+          } > apps/api/.env
+
+      - name: Generate the Prisma client
+        run: npm run db:generate
+
+      - name: Apply database migrations to an empty database
+        run: npm run db:migrate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

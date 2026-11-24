@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     services:
       postgres:
@@ -81,3 +81,15 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Tests and the dev server run from source, so they cannot notice a build
+      # artifact that fails to start. This starts the compiled server for real
+      # and walks the auth path against the migrated database.
+      - name: Smoke test the built API
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          node --env-file=.env dist/server.js > "$RUNNER_TEMP/api.log" 2>&1 &
+          server_pid=$!
+          trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api.log"; fi' EXIT
+          node scripts/smoke.mjs http://127.0.0.1:5000 --write

@@ -105,3 +105,18 @@ jobs:
           server_pid=$!
           trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then echo "--- server log ---"; cat "$RUNNER_TEMP/api-down.log"; fi' EXIT
           node scripts/smoke.mjs http://127.0.0.1:5002 --expect-database-down
+
+      # Builds the image from a clean checkout, the way a host will, then runs it
+      # against the migrated service database. Register and login exercise the
+      # native password hashing module, whose Alpine (musl) build is the likeliest
+      # thing to break in this image.
+      - name: Build the container image
+        run: docker build --tag devforge-api:ci .
+
+      - name: Smoke test the container image
+        run: |
+          set -euo pipefail
+          docker run --detach --name devforge-api --network host \
+            --env-file apps/api/.env --env PORT=5001 devforge-api:ci
+          trap 'status=$?; if [ "$status" -ne 0 ]; then echo "--- container log ---"; docker logs devforge-api || true; fi; docker rm --force devforge-api > /dev/null 2>&1 || true' EXIT
+          node apps/api/scripts/smoke.mjs http://127.0.0.1:5001 --write

@@ -23,6 +23,7 @@ import { WorkspaceGate } from "./pages/WorkspaceGate";
 import type {
   Project,
   Workspace,
+  WorkspaceRole,
 } from "./types/api.types";
 
 export const App: React.FC = () => {
@@ -276,20 +277,27 @@ export const App: React.FC = () => {
 
   /*
    * LOAD PROJECTS AFTER WORKSPACE SELECTION
+   *
+   * Keyed on the workspace id, not the object: the object is also replaced
+   * when only a cached field changes (for example the user's own role after
+   * stepping down), and reloading projects then would swap the whole shell
+   * for the loading screen and close whatever panel the user has open.
    */
+  const activeWorkspaceId = activeWorkspace?.id ?? null;
+
   useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
 
-    if (!activeWorkspace) {
+    if (!activeWorkspaceId) {
       return;
     }
 
-    void loadProjects(activeWorkspace.id);
+    void loadProjects(activeWorkspaceId);
   }, [
     isAuthenticated,
-    activeWorkspace,
+    activeWorkspaceId,
     loadProjects,
   ]);
 
@@ -434,6 +442,38 @@ export const App: React.FC = () => {
   };
 
   /*
+   * LEAVE WORKSPACE
+   *
+   * The membership is already gone on the server, so the cached workspace
+   * list is stale. Reloading it lands the user on the workspace gate with
+   * only the workspaces they still belong to.
+   */
+  const handleLeaveWorkspace = (): void => {
+    handleSwitchWorkspace();
+    void loadWorkspaces();
+  };
+
+  /*
+   * OWN ROLE CHANGED
+   *
+   * Keeps the active workspace's membership in step with the server so
+   * role-gated UI reflects the new role without a reload.
+   */
+  const handleOwnRoleChanged = (role: WorkspaceRole): void => {
+    const applyRole = (workspace: Workspace): Workspace =>
+      workspace.membership
+        ? { ...workspace, membership: { ...workspace.membership, role } }
+        : workspace;
+
+    setActiveWorkspace((current) => (current ? applyRole(current) : current));
+    setWorkspaces((current) =>
+      current.map((workspace) =>
+        workspace.id === activeWorkspace?.id ? applyRole(workspace) : workspace,
+      ),
+    );
+  };
+
+  /*
    * LOGOUT
    *
    * api.logout revokes the server session, clears tokens and fires the
@@ -567,6 +607,8 @@ export const App: React.FC = () => {
       onProjectUpdated={handleProjectUpdated}
       onProjectDeleted={handleProjectDeleted}
       onSwitchWorkspace={handleSwitchWorkspace}
+      onLeaveWorkspace={handleLeaveWorkspace}
+      onOwnRoleChanged={handleOwnRoleChanged}
       onLogout={handleLogout}
     >
       <WorkStream

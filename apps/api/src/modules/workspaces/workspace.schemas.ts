@@ -57,6 +57,39 @@ const forbiddenSchema = {
   },
 } as const;
 
+const memberNotFoundSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["error", "message"],
+  properties: {
+    error: {
+      type: "string",
+      enum: ["WORKSPACE_NOT_FOUND", "WORKSPACE_MEMBERSHIP_NOT_FOUND"],
+    },
+    message: { type: "string" },
+  },
+} as const;
+
+const ownerRequiredSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["error", "message"],
+  properties: {
+    error: { type: "string", const: "WORKSPACE_OWNER_REQUIRED" },
+    message: { type: "string", const: "A workspace must have an owner." },
+  },
+} as const;
+
+const workspaceMemberParamsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["workspaceId", "userId"],
+  properties: {
+    workspaceId: { type: "string" },
+    userId: { type: "string", description: "The member's user id." },
+  },
+} as const;
+
 const teamSlugAlreadyExistsSchema = {
   type: "object",
   additionalProperties: false,
@@ -215,6 +248,49 @@ export const listWorkspaceMembersSchema = {
       },
     },
     404: workspaceNotFoundSchema,
+  },
+} as const;
+
+export const updateWorkspaceMemberRoleSchema = {
+  tags: ["Workspaces"],
+  summary: "Change a member's role",
+  description:
+    "Changes a workspace member's role. OWNER may set any role; ADMIN may set ADMIN, DEVELOPER or VIEWER but may neither grant OWNER nor change an OWNER's role. The last OWNER cannot be demoted.",
+  params: workspaceMemberParamsSchema,
+  body: {
+    type: "object",
+    additionalProperties: false,
+    required: ["role"],
+    properties: {
+      role: { type: "string", enum: [...WORKSPACE_ROLES] },
+    },
+  },
+  response: {
+    200: {
+      type: "object",
+      additionalProperties: false,
+      required: ["data"],
+      properties: {
+        data: workspaceMemberSchema,
+      },
+    },
+    403: forbiddenSchema,
+    404: memberNotFoundSchema,
+    409: ownerRequiredSchema,
+  },
+} as const;
+
+export const removeWorkspaceMemberSchema = {
+  tags: ["Workspaces"],
+  summary: "Remove a member or leave the workspace",
+  description:
+    "Removes a member from the workspace, including their team memberships and work item assignments there. OWNER may remove anyone; ADMIN may remove DEVELOPERs and VIEWERs; any member may remove themselves. The last OWNER cannot be removed.",
+  params: workspaceMemberParamsSchema,
+  response: {
+    204: { type: "null", description: "Member removed." },
+    403: forbiddenSchema,
+    404: memberNotFoundSchema,
+    409: ownerRequiredSchema,
   },
 } as const;
 

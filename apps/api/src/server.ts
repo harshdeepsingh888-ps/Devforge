@@ -46,6 +46,11 @@ const buildLogRepository = new PrismaBuildLogRepository(prisma);
 const deploymentRepository = new PrismaDeploymentRepository(prisma);
 
 const app = buildApp({
+  // Makes GET /ready answer 503 when the database stops answering. Do not drop
+  // this: without it /ready would report ready regardless of the database.
+  readinessCheck: async () => {
+    await prisma.$queryRaw`SELECT 1`;
+  },
   authenticationService: authenticationModule.authenticationService,
   accessTokenService: authenticationModule.accessTokenService,
   workspaceRepository,

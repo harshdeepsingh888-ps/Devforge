@@ -40,7 +40,21 @@ COPY apps/api/package.json ./apps/api/package.json
 RUN npm ci --omit=dev --ignore-scripts --workspace @devforge/api \
   && npm cache clean --force
 
+# Prisma's schema engine, which applies migrations, is a native binary that its
+# postinstall step would normally download. That step is skipped above, so
+# without this the first `migrate deploy` would try to download it at start-up
+# into a directory the app user cannot write to. Asking the CLI for its version
+# fetches it now, at build time. The schema engine also needs OpenSSL on Alpine.
+RUN apk add --no-cache openssl \
+  && npm exec --workspace @devforge/api -- prisma --version
+
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+# Migration inputs and the entrypoint. start.mjs applies the migrations first
+# when RUN_MIGRATIONS_ON_START=true, then starts the server.
+COPY apps/api/prisma ./apps/api/prisma
+COPY apps/api/prisma.config.ts ./apps/api/prisma.config.ts
+COPY apps/api/scripts/start.mjs ./apps/api/scripts/start.mjs
 
 # The app only reads its own files, so they stay owned by root and the process
 # runs as a user that cannot modify them.
@@ -56,4 +70,4 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/health" || exit 1
 
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["node", "apps/api/scripts/start.mjs"]

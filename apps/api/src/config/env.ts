@@ -80,6 +80,9 @@ export const env = {
   // serves both the API and the app; unset in development.
   webDistDir: process.env.WEB_DIST_DIR?.trim() || undefined,
 
+  // Temporary: logs the client address so TRUST_PROXY can be calibrated.
+  logClientAddress: process.env.LOG_CLIENT_ADDRESS === "true",
+
   host:
     process.env.HOST?.trim() ||
     DEFAULT_HOST,

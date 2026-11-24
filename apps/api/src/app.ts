@@ -17,6 +17,7 @@ import {
   type ProjectRepository,
 } from "./modules/projects/project.repository.js";
 import { projectRoutes } from "./modules/projects/project.routes.js";
+import { pathOnly } from "./http/path-only.js";
 import { readinessRoutes } from "./routes/readiness.routes.js";
 import { webAssetsPlugin, type WebAssetsOptions } from "./routes/web-assets.js";
 import type { AccessTokenService } from "./modules/auth/security/jwt.service.js";
@@ -149,6 +150,13 @@ export interface BuildAppOptions {
    * development, where Vite serves the app, and in tests.
    */
   webAssets?: WebAssetsOptions | undefined;
+  /**
+   * Add the client address (as resolved with TRUST_PROXY) and the raw
+   * X-Forwarded-For header to the request log. For finding the right
+   * TRUST_PROXY hop count on a new host; off by default because they are
+   * personal data.
+   */
+  logClientAddress?: boolean | undefined;
 }
 
 export function buildApp(
@@ -388,9 +396,15 @@ export function buildApp(
         {
           requestId: request.id,
           method: request.method,
-          url: request.url,
+          url: pathOnly(request.url),
           statusCode: reply.statusCode,
           durationMs: reply.elapsedTime,
+          ...(options.logClientAddress
+            ? {
+                ip: request.ip,
+                forwardedFor: request.headers["x-forwarded-for"],
+              }
+            : {}),
         },
         "Request completed",
       );
@@ -404,7 +418,7 @@ export function buildApp(
           err: error,
           requestId: request.id,
           method: request.method,
-          url: request.url,
+          url: pathOnly(request.url),
         },
         "Request error",
       );

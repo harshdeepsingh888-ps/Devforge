@@ -59,11 +59,14 @@ services:
       - key: PORT
         value: "10000"
       # TEMPORARY. Logs the client address and the raw X-Forwarded-For header so
-      # the right TRUST_PROXY value can be measured (docs/DEPLOY.md, step 5).
-      # Remove this variable once TRUST_PROXY is set.
+      # the TRUST_PROXY value could be measured (docs/DEPLOY.md). Remove this
+      # variable once the value below has been checked on the live service.
       - key: LOG_CLIENT_ADDRESS
         value: "true"
-      # TRUST_PROXY is deliberately not set yet. Render does not document how
-      # many proxies sit in front of a service, and a wrong number lets a client
-      # choose its own rate-limit bucket. Until it is measured, every visitor
-      # shares one bucket of 100 requests a minute.
+      # Measured on the first deploy (docs/DEPLOY.md): a request reaches the app
+      # through three proxies, in the order Cloudflare, Render, and the sidecar
+      # on 127.0.0.1. With 3, the API skips exactly those three and takes the
+      # next address as the client. A lower number makes every visitor share
+      # one rate-limit bucket; a higher one lets a client choose its own.
+      - key: TRUST_PROXY
+        value: "3"

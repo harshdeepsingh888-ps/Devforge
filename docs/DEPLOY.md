@@ -73,6 +73,25 @@ sending a forged `X-Forwarded-For` header.
 
 If you cannot tell which address is yours, stop and ask rather than guess.
 
+### Measured on the first deploy (2026-11-25): `TRUST_PROXY=3`
+
+A request with a forged header arrived with `forwardedFor` of
+`<forged>, <client>, <Cloudflare address>, <Render internal address>`, and the
+socket peer (`ip` with trust off) was `127.0.0.1`. That is three proxies, so
+`render.yaml` sets `TRUST_PROXY` to `3`. Plain requests showed the same shape,
+which is how the client address was told apart from the forged one.
+`trust-proxy-render.test.ts` pins this chain, including what a count that is
+too low or too high would do.
+
+Re-measure if the logged `ip` of a normal request stops being the visitor's own
+address. That would mean Render changed the number of proxies in front of
+services. Too low is the quieter failure: everyone shares one rate-limit bucket.
+Too high is the dangerous one: a caller can choose its own.
+
+`LOG_CLIENT_ADDRESS` stays on in `render.yaml` only until the value has been
+checked on the live service (send a forged header; the logged `ip` must be your
+own address, not the forged one). Then remove it so addresses stop being logged.
+
 ## Things to know about the free plans
 
 - **The free database is deleted 30 days after it is created** (with a 14 day

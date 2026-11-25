@@ -61,7 +61,8 @@ test("migrations run at start, because the free plan has no pre-deploy command",
   assert.doesNotMatch(config, /preDeployCommand/);
 });
 
-test("TRUST_PROXY is not set until the hop count has been measured", () => {
-  // A wrong value lets a client pick its own rate-limit bucket.
-  assert.doesNotMatch(config, /key:\s*TRUST_PROXY/);
+test("TRUST_PROXY is the measured hop count, never a boolean", () => {
+  // Three proxies were measured in front of the service on the first deploy.
+  // "true" would trust a header the client controls.
+  assert.match(config, /key:\s*TRUST_PROXY\s*\n\s*value:\s*"3"/);
 });

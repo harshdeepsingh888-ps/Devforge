@@ -79,7 +79,10 @@ test("GET /ready answers 503 within the timeout when the database never answers"
 
   assert.equal(response.statusCode, 503);
   assert.deepEqual(response.json(), { status: "unavailable" });
-  assert.ok(elapsedMs < 1_000, `took ${elapsedMs}ms, expected about 50ms`);
+  // The point is that a check which never answers cannot hang the request; the
+  // configured timeout is 50ms. The bound is generous on purpose: the full suite
+  // runs files in parallel, and on a loaded machine 1s was not enough once.
+  assert.ok(elapsedMs < 5_000, `took ${elapsedMs}ms, expected about 50ms`);
 });
 
 test("a fast successful check does not leave its timeout timer running", async (t) => {

@@ -58,11 +58,6 @@ services:
         value: "true"
       - key: PORT
         value: "10000"
-      # TEMPORARY. Logs the client address and the raw X-Forwarded-For header so
-      # the TRUST_PROXY value could be measured (docs/DEPLOY.md). Remove this
-      # variable once the value below has been checked on the live service.
-      - key: LOG_CLIENT_ADDRESS
-        value: "true"
       # Measured on the first deploy (docs/DEPLOY.md): a request reaches the app
       # through three proxies, in the order Cloudflare, Render, and the sidecar
       # on 127.0.0.1. With 3, the API skips exactly those three and takes the

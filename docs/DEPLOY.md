@@ -25,8 +25,9 @@ does not match, look for the closest one.
    If it stops after the migration step with `Not starting the API`, the
    migration failed: the message above it says why, and the previous version
    (if any) keeps serving.
-5. **Calibrate `TRUST_PROXY`** (below). Until you do, every visitor shares one
-   rate limit of 100 requests a minute.
+5. **`TRUST_PROXY` is already set** in `render.yaml` to the value measured on
+   the first deploy (below). Only repeat the measurement if Render changes how
+   many proxies sit in front of services.
 
 ## Check that it works
 
@@ -49,6 +50,11 @@ it once. Getting it wrong in either direction is bad: too low and every visitor
 shares one rate-limit bucket, too high and a client can choose its own bucket by
 sending a forged `X-Forwarded-For` header.
 
+This is the procedure used on the first deploy. To repeat it, first add
+`LOG_CLIENT_ADDRESS` with the value `true` on the service's **Environment**
+page, which makes the log show the two fields in step 3. Remove it afterwards:
+addresses are personal data.
+
 1. Find your public IP address (search "what is my IP").
 2. Send one request with a forged header:
 
@@ -57,19 +63,17 @@ sending a forged `X-Forwarded-For` header.
    ```
 
 3. In the service's **Logs**, find the matching `Request completed` line. It
-   has two extra fields, `ip` and `forwardedFor` (the blueprint turns that on
-   with `LOG_CLIENT_ADDRESS`). `forwardedFor` reads like
+   has two extra fields, `ip` and `forwardedFor`. `forwardedFor` reads like
    `203.0.113.99, <your IP>` possibly followed by more addresses.
 4. Count the addresses **after** your own IP and add one. That is the number of
    proxies in front of the service, and it is the value for `TRUST_PROXY`:
    - `203.0.113.99, <your IP>` gives `1`
    - `203.0.113.99, <your IP>, <another address>` gives `2`
-5. In the service's **Environment** page add `TRUST_PROXY` with that number and
-   delete `LOG_CLIENT_ADDRESS`. Render redeploys.
+5. Set `TRUST_PROXY` to that number (in `render.yaml`, via a pull request, so
+   the file stays the source of truth). Render redeploys after the merge.
 6. Repeat step 2. The logged `ip` must now be **your own address**, not
    `203.0.113.99`. If it is the forged one, the number is too high: lower it.
-   Then add `TRUST_PROXY` to `render.yaml` in a small pull request and remove
-   `LOG_CLIENT_ADDRESS` there too, so the file matches the service.
+   Then remove `LOG_CLIENT_ADDRESS` from the service.
 
 If you cannot tell which address is yours, stop and ask rather than guess.
 
@@ -88,9 +92,11 @@ address. That would mean Render changed the number of proxies in front of
 services. Too low is the quieter failure: everyone shares one rate-limit bucket.
 Too high is the dangerous one: a caller can choose its own.
 
-`LOG_CLIENT_ADDRESS` stays on in `render.yaml` only until the value has been
-checked on the live service (send a forged header; the logged `ip` must be your
-own address, not the forged one). Then remove it so addresses stop being logged.
+The value was checked on the live service the same day: with a forged
+`X-Forwarded-For`, the logged `ip` was the caller's real address and the forged
+one was ignored. `LOG_CLIENT_ADDRESS` was then removed from `render.yaml`, so
+client addresses are no longer logged. Set it temporarily (in the Render
+dashboard) if you ever need to re-measure.
 
 ## Things to know about the free plans
 

@@ -66,3 +66,9 @@ test("TRUST_PROXY is the measured hop count, never a boolean", () => {
   // "true" would trust a header the client controls.
   assert.match(config, /key:\s*TRUST_PROXY\s*\n\s*value:\s*"3"/);
 });
+
+test("client addresses are not logged in production", () => {
+  // LOG_CLIENT_ADDRESS was only for measuring TRUST_PROXY. Addresses are
+  // personal data, so the switch is not left on.
+  assert.doesNotMatch(config, /key:\s*LOG_CLIENT_ADDRESS/);
+});

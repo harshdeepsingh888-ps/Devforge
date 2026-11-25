@@ -23,7 +23,8 @@
     "db:migrate": "npm run db:migrate --workspace @devforge/api",
     "db:reset": "npm run db:reset --workspace @devforge/api",
     "db:generate": "npm run db:generate --workspace @devforge/api",
-    "db:setup": "npm run db:setup --workspace @devforge/api"
+    "db:setup": "npm run db:setup --workspace @devforge/api",
+    "ship": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ship.ps1"
   },
   "engines": {
     "node": ">=24"

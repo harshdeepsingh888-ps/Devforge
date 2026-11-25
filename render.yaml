@@ -1,0 +1,69 @@
+# Render Blueprint: one web service and one Postgres database.
+#
+# The web service is built from the Dockerfile and serves both the API and the
+# web app on one origin. docs/DEPLOY.md has the one-time setup and what to
+# check after the first deploy.
+
+databases:
+  - name: devforge-db
+    # FREE databases are deleted 30 days after creation (with a 14 day grace
+    # period). Fine for trying the deploy; upgrade the plan in the Render
+    # dashboard, or move to a paid plan here, before anything you want to keep.
+    plan: free
+    region: singapore
+    # The version CI tests against.
+    postgresMajorVersion: "16"
+    databaseName: devforge
+    user: devforge
+    # Internal connections only: nothing outside Render can reach the database.
+    ipAllowList: []
+
+services:
+  - type: web
+    name: devforge
+    runtime: docker
+    # FREE web services sleep after 15 minutes without traffic and take about a
+    # minute to wake. Fine for a demo.
+    plan: free
+    # Must match the database's region: the internal connection string only
+    # works inside one region. Neither can be changed after creation.
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Liveness only, on purpose. Render restarts an instance that fails its
+    # health check for 60 seconds, so this must never be /ready: a database
+    # outage would then restart a perfectly healthy container over and over.
+    healthCheckPath: /health
+    # Deploy a commit only after its GitHub checks pass. Combined with the
+    # protected main branch, a red build cannot be deployed.
+    autoDeployTrigger: checksPass
+    envVars:
+      # The internal connection string; it needs no TLS.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: devforge-db
+          property: connectionString
+      # Random 256-bit value, generated once and kept across deploys. The API
+      # requires at least 32 bytes.
+      - key: JWT_ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: JWT_ISSUER
+        value: "devforge-api"
+      - key: JWT_AUDIENCE
+        value: "devforge-web"
+      # Render's pre-deploy command is not available on the free plan, so the
+      # new instance applies migrations before it starts serving. If a migration
+      # fails the instance never becomes healthy and the old version stays up.
+      - key: RUN_MIGRATIONS_ON_START
+        value: "true"
+      - key: PORT
+        value: "10000"
+      # TEMPORARY. Logs the client address and the raw X-Forwarded-For header so
+      # the right TRUST_PROXY value can be measured (docs/DEPLOY.md, step 5).
+      # Remove this variable once TRUST_PROXY is set.
+      - key: LOG_CLIENT_ADDRESS
+        value: "true"
+      # TRUST_PROXY is deliberately not set yet. Render does not document how
+      # many proxies sit in front of a service, and a wrong number lets a client
+      # choose its own rate-limit bucket. Until it is measured, every visitor
+      # shares one bucket of 100 requests a minute.

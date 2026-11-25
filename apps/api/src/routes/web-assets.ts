@@ -5,6 +5,8 @@ import fastifyStatic from "@fastify/static";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
+import { pathOnly } from "../http/path-only.js";
+
 export interface WebAssetsOptions {
   /** Directory holding the built web app (the output of `vite build`). */
   directory: string;
@@ -20,12 +22,6 @@ const API_ONLY_PATHS = new Set(["/health", "/ready"]);
 // be cached or a deploy would not reach people who already have the old one.
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const REVALIDATE_CACHE = "no-cache";
-
-function pathOf(url: string): string {
-  const queryStart = url.indexOf("?");
-
-  return queryStart === -1 ? url : url.slice(0, queryStart);
-}
 
 /**
  * True for a URL that the browser app should answer: a page route such as
@@ -92,7 +88,7 @@ export const webAssetsPlugin = fp<WebAssetsOptions>(
     app.setNotFoundHandler((request, reply) => {
       const isPageRequest =
         (request.method === "GET" || request.method === "HEAD") &&
-        isClientRoute(pathOf(request.url));
+        isClientRoute(pathOnly(request.url));
 
       if (!isPageRequest) {
         return notFound(request, reply);
